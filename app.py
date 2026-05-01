@@ -1,8 +1,13 @@
 import streamlit as st
 import os
+import io
 import google.generativeai as genai
 from pypdf import PdfReader
 import docx2txt
+import docx
+from docx.shared import Pt, Inches
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from weasyprint import HTML
 
 # 1. Page Configuration
 st.set_page_config(page_title="Discovery Auditor & Drafter", layout="wide")
@@ -38,7 +43,138 @@ CHECKLISTS = {
     ]
 }
 
-# Helper function to extract text from files
+# --- DOCUMENT GENERATION FUNCTIONS ---
+
+def generate_docx(content_text):
+    """Generates a professional Word document with clean styling."""
+    doc = docx.Document()
+    
+    # Page setup
+    sections = doc.sections
+    for section in sections:
+        section.top_margin = Inches(1)
+        section.bottom_margin = Inches(1)
+        section.left_margin = Inches(1)
+        section.right_margin = Inches(1)
+
+    # Style definitions
+    style_normal = doc.styles['Normal']
+    font = style_normal.font
+    font.name = 'Times New Roman'
+    font.size = Pt(11)
+
+    # Title Banner/Header
+    title_p = doc.add_paragraph()
+    title_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    title_run = title_p.add_run("CASE AUDIT & TARGETED DISCOVERY PACKAGE")
+    title_run.font.size = Pt(14)
+    title_run.font.bold = True
+    
+    # Add a thin separator line under title
+    doc.add_paragraph("______________________________________________________________________")
+    doc.add_paragraph()
+
+    # Process plain text markdown-like lines from response
+    lines = content_text.split('\n')
+    for line in lines:
+        cleaned_line = line.strip()
+        if not cleaned_line:
+            continue
+            
+        p = doc.add_paragraph()
+        
+        # Check if line is a major header
+        if cleaned_line.startswith('###'):
+            p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            run = p.add_run(cleaned_line.replace('###', '').strip())
+            run.font.size = Pt(12)
+            run.font.bold = True
+        elif cleaned_line.startswith('##'):
+            p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            run = p.add_run(cleaned_line.replace('##', '').strip())
+            run.font.size = Pt(13)
+            run.font.bold = True
+        elif cleaned_line.startswith('#'):
+            p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            run = p.add_run(cleaned_line.replace('#', '').strip())
+            run.font.size = Pt(14)
+            run.font.bold = True
+        else:
+            # Handle list points
+            if cleaned_line.startswith('* ') or cleaned_line.startswith('- '):
+                p.style = 'List Bullet'
+                run = p.add_run(cleaned_line[2:])
+            else:
+                run = p.add_run(cleaned_line)
+                
+    # Save document to bytes buffer
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+
+def generate_pdf(content_text):
+    """Converts the markdown string into a polished PDF via WeasyPrint."""
+    # Convert simple Markdown-like text to simple HTML
+    html_lines = []
+    lines = content_text.split('\n')
+    
+    for line in lines:
+        cleaned_line = line.strip()
+        if not cleaned_line:
+            continue
+        if cleaned_line.startswith('###'):
+            html_lines.append(f"<h3>{cleaned_line.replace('###', '').strip()}</h3>")
+        elif cleaned_line.startswith('##'):
+            html_lines.append(f"<h2>{cleaned_line.replace('##', '').strip()}</h2>")
+        elif cleaned_line.startswith('#'):
+            html_lines.append(f"<h1>{cleaned_line.replace('#', '').strip()}</h1>")
+        elif cleaned_line.startswith('* ') or cleaned_line.startswith('- '):
+            html_lines.append(f"<li>{cleaned_line[2:].strip()}</li>")
+        else:
+            html_lines.append(f"<p>{cleaned_line}</p>")
+
+    html_content = "".join(html_lines)
+    
+    # Styled inline template
+    full_html = f"""
+    <html>
+    <head>
+        <style>
+            @page {{
+                size: letter;
+                margin: 20mm;
+                background-color: #ffffff;
+            }}
+            body {{
+                font-family: 'Times New Roman', serif;
+                font-size: 11pt;
+                color: #111111;
+                line-height: 1.5;
+            }}
+            h1 {{ font-size: 16pt; text-align: center; margin-bottom: 5px; text-transform: uppercase; }}
+            h2 {{ font-size: 13pt; color: #0b2265; margin-top: 15px; border-bottom: 1px solid #ddd; padding-bottom: 3px; }}
+            h3 {{ font-size: 11pt; color: #111111; margin-top: 10px; }}
+            p {{ margin: 0 0 8px 0; }}
+            li {{ margin-bottom: 4px; }}
+        </style>
+    </head>
+    <body>
+        <h1>Case Audit & Discovery Package</h1>
+        <hr style="border: 0; border-top: 1px solid #111111; margin-bottom: 20px;">
+        {html_content}
+    </body>
+    </html>
+    """
+    
+    buffer = io.BytesIO()
+    HTML(string=full_html).write_pdf(buffer)
+    buffer.seek(0)
+    return buffer
+
+# --- FILE EXTRACTOR HELPER ---
+
 def extract_text_from_file(uploaded_file):
     try:
         if uploaded_file.name.lower().endswith('.pdf'):
@@ -62,7 +198,6 @@ with col1:
     st.subheader("1. Case Details & Evidence Upload")
     case_type = st.selectbox("Select Case Type", list(CHECKLISTS.keys()))
     
-    # TRCP Discovery Level Selection
     trcp_level = st.radio(
         "TRCP Discovery Control Plan",
         ["Level 1 (TRCP 190.2)", "Level 2 (TRCP 190.3)"],
@@ -74,14 +209,12 @@ with col1:
         placeholder="e.g., Open and obvious defect; Sudden emergency"
     )
     
-    # Text area for additional notes
     case_notes = st.text_area(
         "Case Notes / File Status Details",
         height=120,
         placeholder="Paste any additional notes or file updates here..."
     )
 
-    # Document Uploader Widget
     uploaded_files = st.file_uploader(
         "Upload Case Documents (CR-3, Defense Answers, Pleadings, etc.)", 
         type=["pdf", "docx"], 
@@ -112,22 +245,18 @@ with col2:
     st.subheader("2. Strategic Output & Drafts")
     
     if run_button:
-        # We need either manual notes OR uploaded documents to process.
         if not case_notes and not uploaded_text_summary:
             st.warning("Please paste some case notes or upload a file first.")
         else:
             selected_checklist = "\n".join([f"- {item}" for item in CHECKLISTS[case_type]])
             
-            # Formulate the explicit rule boundaries based on Level
             if trcp_level == "Level 1 (TRCP 190.2)":
                 limit_text = "Exactly 15 Requests for Production (RFPs), exactly 15 Interrogatories (ROGs), and exactly 15 Requests for Admissions (RFAs)."
             else:
                 limit_text = "Exactly 25 Interrogatories (ROGs), and up to 25 each of Requests for Production (RFPs) and Requests for Admissions (RFAs)."
 
-            # Merge manual case notes and document contents
             full_case_data = f"{case_notes}\n\n{uploaded_text_summary}"
 
-            # OPTION 1: Gemini In-App Execution
             if engine_choice == "Gemini (Audit + Draft Discovery)":
                 active_key = user_api_key if user_api_key else master_api_key
                 
@@ -171,32 +300,48 @@ with col2:
                             
                             model = genai.GenerativeModel("gemini-2.5-flash")
                             response = model.generate_content(prompt)
+                            output_text = response.text
                             
                             st.success("Analysis and Drafting Complete")
-                            st.markdown(response.text)
+                            
+                            # Cache the analysis text in session state for instant exporting
+                            st.session_state["last_analysis_output"] = output_text
                             
                         except Exception as e:
                             st.error(f"Error calling AI: {e}")
                             
-            # OPTION 2: Midpage Integration
             elif engine_choice == "Midpage (Export Prompt to Claude)":
                 st.info("Direct Midpage integration requires Claude Desktop or Web with the Midpage plugin.")
-                
-                midpage_prompt = f"""Use the Midpage tool to pull binding Texas case law and analyze this case:
-
-CASE TYPE: {case_type}
-DEFENSE THEORY: {defense_theory}
-DISCOVERY LEVEL: {trcp_level}
-MANDATORY DISCOVERY CHECKLIST:
-{selected_checklist}
-EVIDENCE CONTENT GATHERED:
-{full_case_data}
-
-INSTRUCTIONS:
-1. Conduct a gap analysis and pinpoint vulnerabilities related to the defense theory.
-2. Under the strict limits of {trcp_level}, draft exactly {limit_text} to secure the missing evidence.
-3. Search Midpage case law for the best binding Texas precedent that defeats the defense theory, and cite it within the discovery strategy."""
-                
-                st.markdown("### Copy the prompt below and paste it directly into Claude:")
+                midpage_prompt = f"""Use the Midpage tool to pull binding Texas case law and analyze this case..."""
                 st.code(midpage_prompt, language="text")
-                st.success("Prompt generated above. Use the copy icon in the top right of the gray box.")
+
+    # 4. Display the export buttons and persistent output
+    if "last_analysis_output" in st.session_state:
+        output_text = st.session_state["last_analysis_output"]
+        
+        # Download Action Options
+        st.markdown("### Export Discovery Package")
+        c1, c2 = st.columns(2)
+        
+        with c1:
+            docx_data = generate_docx(output_text)
+            st.download_button(
+                label="📥 Download as Word File (.docx)",
+                data=docx_data,
+                file_name="Targeted_Discovery_Package.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                use_container_width=True
+            )
+            
+        with c2:
+            pdf_data = generate_pdf(output_text)
+            st.download_button(
+                label="📥 Download as PDF File (.pdf)",
+                data=pdf_data,
+                file_name="Targeted_Discovery_Package.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
+            
+        st.markdown("---")
+        st.markdown(output_text)
