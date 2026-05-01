@@ -7,7 +7,7 @@ import docx2txt
 import docx
 from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from weasyprint import HTML
+from fpdf import FPDF
 
 # 1. Page Configuration
 st.set_page_config(page_title="Discovery Auditor & Drafter", layout="wide")
@@ -70,11 +70,11 @@ def generate_docx(content_text):
     title_run.font.size = Pt(14)
     title_run.font.bold = True
     
-    # Add a thin separator line under title
+    # Thin separator line
     doc.add_paragraph("______________________________________________________________________")
     doc.add_paragraph()
 
-    # Process plain text markdown-like lines from response
+    # Process plain text lines
     lines = content_text.split('\n')
     for line in lines:
         cleaned_line = line.strip()
@@ -83,31 +83,26 @@ def generate_docx(content_text):
             
         p = doc.add_paragraph()
         
-        # Check if line is a major header
+        # Check header levels
         if cleaned_line.startswith('###'):
-            p.alignment = WD_ALIGN_PARAGRAPH.LEFT
             run = p.add_run(cleaned_line.replace('###', '').strip())
             run.font.size = Pt(12)
             run.font.bold = True
         elif cleaned_line.startswith('##'):
-            p.alignment = WD_ALIGN_PARAGRAPH.LEFT
             run = p.add_run(cleaned_line.replace('##', '').strip())
             run.font.size = Pt(13)
             run.font.bold = True
         elif cleaned_line.startswith('#'):
-            p.alignment = WD_ALIGN_PARAGRAPH.LEFT
             run = p.add_run(cleaned_line.replace('#', '').strip())
             run.font.size = Pt(14)
             run.font.bold = True
         else:
-            # Handle list points
             if cleaned_line.startswith('* ') or cleaned_line.startswith('- '):
                 p.style = 'List Bullet'
                 run = p.add_run(cleaned_line[2:])
             else:
                 run = p.add_run(cleaned_line)
                 
-    # Save document to bytes buffer
     buffer = io.BytesIO()
     doc.save(buffer)
     buffer.seek(0)
@@ -115,61 +110,52 @@ def generate_docx(content_text):
 
 
 def generate_pdf(content_text):
-    """Converts the markdown string into a polished PDF via WeasyPrint."""
-    # Convert simple Markdown-like text to simple HTML
-    html_lines = []
-    lines = content_text.split('\n')
+    """Generates a standard PDF using pure-Python FPDF2."""
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_margins(left=20, top=20, right=20)
     
+    # Title
+    pdf.set_font("Times", "B", size=14)
+    pdf.cell(w=0, h=10, txt="CASE AUDIT & DISCOVERY PACKAGE", align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(2)
+    
+    # Thin horizontal separator
+    pdf.set_draw_color(150, 150, 150)
+    pdf.line(x1=20, y1=pdf.get_y(), x2=190, y2=pdf.get_y())
+    pdf.ln(8)
+    
+    # Convert input text to ISO-8859-1 compatible text to prevent encoding crashes
+    lines = content_text.split('\n')
     for line in lines:
         cleaned_line = line.strip()
         if not cleaned_line:
+            pdf.ln(2)
             continue
+            
+        # Clean special markdown characters and handle formatting
         if cleaned_line.startswith('###'):
-            html_lines.append(f"<h3>{cleaned_line.replace('###', '').strip()}</h3>")
+            pdf.set_font("Times", "B", size=12)
+            txt = cleaned_line.replace('###', '').strip()
         elif cleaned_line.startswith('##'):
-            html_lines.append(f"<h2>{cleaned_line.replace('##', '').strip()}</h2>")
+            pdf.set_font("Times", "B", size=13)
+            txt = cleaned_line.replace('##', '').strip()
         elif cleaned_line.startswith('#'):
-            html_lines.append(f"<h1>{cleaned_line.replace('#', '').strip()}</h1>")
+            pdf.set_font("Times", "B", size=14)
+            txt = cleaned_line.replace('#', '').strip()
         elif cleaned_line.startswith('* ') or cleaned_line.startswith('- '):
-            html_lines.append(f"<li>{cleaned_line[2:].strip()}</li>")
+            pdf.set_font("Times", "", size=11)
+            txt = f"• {cleaned_line[2:].strip()}"
         else:
-            html_lines.append(f"<p>{cleaned_line}</p>")
+            pdf.set_font("Times", "", size=11)
+            txt = cleaned_line
 
-    html_content = "".join(html_lines)
-    
-    # Styled inline template
-    full_html = f"""
-    <html>
-    <head>
-        <style>
-            @page {{
-                size: letter;
-                margin: 20mm;
-                background-color: #ffffff;
-            }}
-            body {{
-                font-family: 'Times New Roman', serif;
-                font-size: 11pt;
-                color: #111111;
-                line-height: 1.5;
-            }}
-            h1 {{ font-size: 16pt; text-align: center; margin-bottom: 5px; text-transform: uppercase; }}
-            h2 {{ font-size: 13pt; color: #0b2265; margin-top: 15px; border-bottom: 1px solid #ddd; padding-bottom: 3px; }}
-            h3 {{ font-size: 11pt; color: #111111; margin-top: 10px; }}
-            p {{ margin: 0 0 8px 0; }}
-            li {{ margin-bottom: 4px; }}
-        </style>
-    </head>
-    <body>
-        <h1>Case Audit & Discovery Package</h1>
-        <hr style="border: 0; border-top: 1px solid #111111; margin-bottom: 20px;">
-        {html_content}
-    </body>
-    </html>
-    """
-    
+        # Encode text cleanly for FPDF
+        safe_txt = txt.encode('latin-1', 'replace').decode('latin-1')
+        pdf.multi_cell(w=0, h=6, txt=safe_txt)
+        
     buffer = io.BytesIO()
-    HTML(string=full_html).write_pdf(buffer)
+    pdf.output(buffer)
     buffer.seek(0)
     return buffer
 
@@ -303,23 +289,15 @@ with col2:
                             output_text = response.text
                             
                             st.success("Analysis and Drafting Complete")
-                            
-                            # Cache the analysis text in session state for instant exporting
                             st.session_state["last_analysis_output"] = output_text
                             
                         except Exception as e:
                             st.error(f"Error calling AI: {e}")
-                            
-            elif engine_choice == "Midpage (Export Prompt to Claude)":
-                st.info("Direct Midpage integration requires Claude Desktop or Web with the Midpage plugin.")
-                midpage_prompt = f"""Use the Midpage tool to pull binding Texas case law and analyze this case..."""
-                st.code(midpage_prompt, language="text")
 
-    # 4. Display the export buttons and persistent output
+    # 4. Persistence and Export buttons
     if "last_analysis_output" in st.session_state:
         output_text = st.session_state["last_analysis_output"]
         
-        # Download Action Options
         st.markdown("### Export Discovery Package")
         c1, c2 = st.columns(2)
         
