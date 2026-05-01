@@ -3,4 +3,4 @@ google-generativeai
 pypdf
 docx2txt
 python-docx
-weasyprint
+fpdf2
