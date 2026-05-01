@@ -3,12 +3,12 @@ import os
 import google.generativeai as genai
 
 # 1. Page Configuration
-st.set_page_config(page_title="Discovery Auditor", layout="wide")
+st.set_page_config(page_title="Discovery Auditor & Drafter", layout="wide")
 
-# Pull free Google API key from Streamlit secrets
-api_key = os.environ.get("GEMINI_API_KEY")
+# Pull master key if available in Streamlit Secrets
+master_api_key = os.environ.get("GEMINI_API_KEY")
 
-st.title("Case Discovery Auditor & Gap Analyst")
+st.title("Case Discovery Auditor & Drafter")
 st.markdown("---")
 
 # 2. Hardcoded Checklist Database
@@ -40,7 +40,7 @@ CHECKLISTS = {
 col1, col2 = st.columns([1, 1])
 
 with col1:
-    st.subheader("1. Case Details")
+    st.subheader("1. Case Details & Settings")
     case_type = st.selectbox("Select Case Type", list(CHECKLISTS.keys()))
     
     defense_theory = st.text_input(
@@ -50,20 +50,27 @@ with col1:
     
     case_notes = st.text_area(
         "Paste Case Notes / Evidence Gathered",
-        height=250,
+        height=200,
         placeholder="Paste current file status, what discovery has been served, etc."
     )
     
-    # NEW ENGINE PICKER
-    engine_choice = st.radio(
-        "Choose Your Analysis Engine",
-        ["Gemini (In-App Output)", "Midpage (Export Prompt to Claude + Midpage)"]
+    # User Key Override Field
+    user_api_key = st.text_input(
+        "Individual Gemini API Key (Optional)",
+        type="password",
+        placeholder="Paste your individual key here to override the team's master key"
     )
     
-    run_button = st.button("Run Audit", type="primary")
+    # Engine Picker
+    engine_choice = st.radio(
+        "Choose Your Output Format",
+        ["Gemini (Audit + Draft Discovery)", "Midpage (Export Prompt to Claude)"]
+    )
+    
+    run_button = st.button("Generate Audit & Discovery", type="primary")
 
 with col2:
-    st.subheader("2. Audit Output")
+    st.subheader("2. Strategic Output & Drafts")
     
     if run_button:
         if not case_notes:
@@ -72,16 +79,19 @@ with col2:
             selected_checklist = "\n".join([f"- {item}" for item in CHECKLISTS[case_type]])
             
             # OPTION 1: Gemini In-App Execution
-            if engine_choice == "Gemini (In-App Output)":
-                if not api_key:
-                    st.error("Missing API Key. Add your GEMINI_API_KEY to the Streamlit secrets.")
+            if engine_choice == "Gemini (Audit + Draft Discovery)":
+                active_key = user_api_key if user_api_key else master_api_key
+                
+                if not active_key:
+                    st.error("No API key detected. Please enter your individual key or have an admin add the master key in the app settings.")
                 else:
-                    with st.spinner("Analyzing case against the mandatory ruleset via Gemini..."):
+                    with st.spinner("Analyzing and drafting targeted discovery..."):
                         try:
-                            genai.configure(api_key=api_key)
+                            genai.configure(api_key=active_key)
                             
                             prompt = f"""
-                            You are a defense-minded legal auditor checking a plaintiff's case file for discovery gaps.
+                            You are an expert defense-minded legal auditor and discovery drafter checking a plaintiff's personal injury case file.
+                            
                             CASE TYPE: {case_type}
                             DEFENSE THEORY: {defense_theory}
                             MANDATORY CHECKLIST FOR THIS CASE TYPE:
@@ -91,40 +101,44 @@ with col2:
                             {case_notes}
                             
                             TASK:
-                            1. Cross-reference the File Status against the Mandatory Checklist. List each item as [COMPLETED] or [MISSING].
-                            2. Identify any strategic vulnerabilities or blind spots. Focus on what is needed to overcome the Defense Theory under Texas law.
-                            3. Provide immediate corrective action items.
+                            Part 1: Case Audit
+                            - Compare file status against the mandatory checklist. List each item as [COMPLETED] or [MISSING].
+                            - Identify vulnerabilities where the Defense Theory threatens liability.
+                            
+                            Part 2: Draft Targeted Discovery (Texas Rules of Civil Procedure)
+                            - For the [MISSING] items and defense vulnerabilities, draft the exact text for:
+                              1. Requests for Production (RFPs)
+                              2. Interrogatories (ROGs)
+                              3. Deposition Topics
+                            - Ensure the drafted discovery is surgical and specifically designed to dismantle the defense theory.
                             """
                             
                             model = genai.GenerativeModel("gemini-2.5-flash")
                             response = model.generate_content(prompt)
                             
-                            st.success("Gemini Analysis Complete")
+                            st.success("Analysis and Drafting Complete")
                             st.markdown(response.text)
                             
                         except Exception as e:
                             st.error(f"Error calling AI: {e}")
                             
-            # OPTION 2: Midpage + Claude Integration
-            elif engine_choice == "Midpage (Export Prompt to Claude + Midpage)":
-                st.info("Direct Midpage integration requires Claude Desktop or Web with the Midpage MCP plugin.")
+            # OPTION 2: Midpage Integration
+            elif engine_choice == "Midpage (Export Prompt to Claude)":
+                st.info("Direct Midpage integration requires Claude Desktop or Web with the Midpage plugin.")
                 
-                # Format a hyper-specific Midpage/Claude prompt
-                midpage_prompt = f"""Use the Midpage tool to pull binding Texas case law and analyze the following case file:
+                midpage_prompt = f"""Use the Midpage tool to pull binding Texas case law and analyze this case:
 
 CASE TYPE: {case_type}
 DEFENSE THEORY: {defense_theory}
-
-MANDATORY DISCOVERY CHECKLIST TO ENFORCE:
+MANDATORY DISCOVERY CHECKLIST:
 {selected_checklist}
-
-EVIDENCE GATHERED IN THIS FILE:
+EVIDENCE GATHERED:
 {case_notes}
 
 INSTRUCTIONS:
-1. Identify which mandatory checklist items are missing.
-2. Search Midpage case law for the best binding Texas precedent that neutralizes the defense's specific theory ({defense_theory}).
-3. Draft a strategic gap analysis memo, hyperlinking the cases found via Midpage."""
+1. Conduct a gap analysis and pinpoint vulnerabilities related to the defense theory.
+2. Draft targeted Texas-compliant Requests for Production, Interrogatories, and Deposition Topics to secure the missing evidence.
+3. Search Midpage case law for the best binding Texas precedent that defeats the defense theory, and cite it within the discovery strategy."""
                 
                 st.markdown("### Copy the prompt below and paste it directly into Claude:")
                 st.code(midpage_prompt, language="text")
