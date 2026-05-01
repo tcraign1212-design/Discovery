@@ -43,6 +43,13 @@ with col1:
     st.subheader("1. Case Details & Settings")
     case_type = st.selectbox("Select Case Type", list(CHECKLISTS.keys()))
     
+    # NEW: TRCP Discovery Level Selection
+    trcp_level = st.radio(
+        "TRCP Discovery Control Plan",
+        ["Level 1 (TRCP 190.2)", "Level 2 (TRCP 190.3)"],
+        help="Level 1: Max 15 RFPs, 15 ROGs, 15 RFAs. Level 2: Max 25 ROGs."
+    )
+    
     defense_theory = st.text_input(
         "What is the defense's theory?",
         placeholder="e.g., Open and obvious defect; Sudden emergency"
@@ -50,18 +57,16 @@ with col1:
     
     case_notes = st.text_area(
         "Paste Case Notes / Evidence Gathered",
-        height=200,
+        height=180,
         placeholder="Paste current file status, what discovery has been served, etc."
     )
     
-    # User Key Override Field
     user_api_key = st.text_input(
         "Individual Gemini API Key (Optional)",
         type="password",
         placeholder="Paste your individual key here to override the team's master key"
     )
     
-    # Engine Picker
     engine_choice = st.radio(
         "Choose Your Output Format",
         ["Gemini (Audit + Draft Discovery)", "Midpage (Export Prompt to Claude)"]
@@ -78,14 +83,20 @@ with col2:
         else:
             selected_checklist = "\n".join([f"- {item}" for item in CHECKLISTS[case_type]])
             
+            # Map out limits based on selected TRCP level
+            if trcp_level == "Level 1 (TRCP 190.2)":
+                limit_text = "Exactly 15 Requests for Production (RFPs), 15 Interrogatories (ROGs), and 15 Requests for Admissions (RFAs)."
+            else:
+                limit_text = "Exactly 25 Interrogatories (ROGs), and 25 each of Requests for Production (RFPs) and Requests for Admissions (RFAs)."
+
             # OPTION 1: Gemini In-App Execution
             if engine_choice == "Gemini (Audit + Draft Discovery)":
                 active_key = user_api_key if user_api_key else master_api_key
                 
                 if not active_key:
-                    st.error("No API key detected. Please enter your individual key or have an admin add the master key in the app settings.")
+                    st.error("No API key detected. Please enter your individual key or add the master key in the app settings.")
                 else:
-                    with st.spinner("Analyzing and drafting targeted discovery..."):
+                    with st.spinner("Analyzing and drafting complete discovery package..."):
                         try:
                             genai.configure(api_key=active_key)
                             
@@ -94,6 +105,7 @@ with col2:
                             
                             CASE TYPE: {case_type}
                             DEFENSE THEORY: {defense_theory}
+                            DISCOVERY CONTROL PLAN: {trcp_level}
                             MANDATORY CHECKLIST FOR THIS CASE TYPE:
                             {selected_checklist}
                             
@@ -105,12 +117,12 @@ with col2:
                             - Compare file status against the mandatory checklist. List each item as [COMPLETED] or [MISSING].
                             - Identify vulnerabilities where the Defense Theory threatens liability.
                             
-                            Part 2: Draft Targeted Discovery (Texas Rules of Civil Procedure)
-                            - For the [MISSING] items and defense vulnerabilities, draft the exact text for:
-                              1. Requests for Production (RFPs)
-                              2. Interrogatories (ROGs)
-                              3. Deposition Topics
-                            - Ensure the drafted discovery is surgical and specifically designed to dismantle the defense theory.
+                            Part 2: Draft Targeted Discovery (Strictly bound by TRCP limits)
+                            Draft exactly the following number of requests based on {trcp_level}:
+                            {limit_text}
+                            
+                            - Draft targeted admissions designed to force the defense to admit elements of negligence or trap them on the facts.
+                            - Ensure all drafted discovery is surgical, directly dismantling the defense theory, and complies with Texas civil procedure rules.
                             """
                             
                             model = genai.GenerativeModel("gemini-2.5-flash")
@@ -130,6 +142,7 @@ with col2:
 
 CASE TYPE: {case_type}
 DEFENSE THEORY: {defense_theory}
+DISCOVERY LEVEL: {trcp_level}
 MANDATORY DISCOVERY CHECKLIST:
 {selected_checklist}
 EVIDENCE GATHERED:
@@ -137,7 +150,7 @@ EVIDENCE GATHERED:
 
 INSTRUCTIONS:
 1. Conduct a gap analysis and pinpoint vulnerabilities related to the defense theory.
-2. Draft targeted Texas-compliant Requests for Production, Interrogatories, and Deposition Topics to secure the missing evidence.
+2. Under the strict rules of {trcp_level}, draft exactly {limit_text} to secure the missing evidence.
 3. Search Midpage case law for the best binding Texas precedent that defeats the defense theory, and cite it within the discovery strategy."""
                 
                 st.markdown("### Copy the prompt below and paste it directly into Claude:")
