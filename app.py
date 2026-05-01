@@ -1,6 +1,8 @@
 import streamlit as st
 import os
 import google.generativeai as genai
+from pypdf import PdfReader
+import docx2txt
 
 # 1. Page Configuration
 st.set_page_config(page_title="Discovery Auditor & Drafter", layout="wide")
@@ -36,14 +38,31 @@ CHECKLISTS = {
     ]
 }
 
+# Helper function to extract text from files
+def extract_text_from_file(uploaded_file):
+    try:
+        if uploaded_file.name.lower().endswith('.pdf'):
+            reader = PdfReader(uploaded_file)
+            extracted = []
+            for page in reader.pages:
+                text = page.extract_text()
+                if text:
+                    extracted.append(text)
+            return "\n".join(extracted)
+        elif uploaded_file.name.lower().endswith('.docx'):
+            return docx2txt.process(uploaded_file)
+    except Exception as e:
+        return f"Error reading file: {str(e)}"
+    return ""
+
 # 3. Two-Column User Interface
 col1, col2 = st.columns([1, 1])
 
 with col1:
-    st.subheader("1. Case Details & Settings")
+    st.subheader("1. Case Details & Evidence Upload")
     case_type = st.selectbox("Select Case Type", list(CHECKLISTS.keys()))
     
-    # NEW: TRCP Discovery Level Selection
+    # TRCP Discovery Level Selection
     trcp_level = st.radio(
         "TRCP Discovery Control Plan",
         ["Level 1 (TRCP 190.2)", "Level 2 (TRCP 190.3)"],
@@ -55,11 +74,26 @@ with col1:
         placeholder="e.g., Open and obvious defect; Sudden emergency"
     )
     
+    # Text area for additional notes
     case_notes = st.text_area(
-        "Paste Case Notes / Evidence Gathered",
-        height=180,
-        placeholder="Paste current file status, what discovery has been served, etc."
+        "Case Notes / File Status Details",
+        height=120,
+        placeholder="Paste any additional notes or file updates here..."
     )
+
+    # Document Uploader Widget
+    uploaded_files = st.file_uploader(
+        "Upload Case Documents (CR-3, Defense Answers, Pleadings, etc.)", 
+        type=["pdf", "docx"], 
+        accept_multiple_files=True
+    )
+
+    uploaded_text_summary = ""
+    if uploaded_files:
+        st.info(f"Loaded {len(uploaded_files)} file(s).")
+        for f in uploaded_files:
+            file_text = extract_text_from_file(f)
+            uploaded_text_summary += f"\n--- EXTRACTED FROM FILE: {f.name} ---\n{file_text}\n"
     
     user_api_key = st.text_input(
         "Individual Gemini API Key (Optional)",
@@ -78,16 +112,20 @@ with col2:
     st.subheader("2. Strategic Output & Drafts")
     
     if run_button:
-        if not case_notes:
-            st.warning("Please paste some case notes first.")
+        # We need either manual notes OR uploaded documents to process.
+        if not case_notes and not uploaded_text_summary:
+            st.warning("Please paste some case notes or upload a file first.")
         else:
             selected_checklist = "\n".join([f"- {item}" for item in CHECKLISTS[case_type]])
             
-            # Map out limits based on selected TRCP level
+            # Formulate the explicit rule boundaries based on Level
             if trcp_level == "Level 1 (TRCP 190.2)":
-                limit_text = "Exactly 15 Requests for Production (RFPs), 15 Interrogatories (ROGs), and 15 Requests for Admissions (RFAs)."
+                limit_text = "Exactly 15 Requests for Production (RFPs), exactly 15 Interrogatories (ROGs), and exactly 15 Requests for Admissions (RFAs)."
             else:
-                limit_text = "Exactly 25 Interrogatories (ROGs), and 25 each of Requests for Production (RFPs) and Requests for Admissions (RFAs)."
+                limit_text = "Exactly 25 Interrogatories (ROGs), and up to 25 each of Requests for Production (RFPs) and Requests for Admissions (RFAs)."
+
+            # Merge manual case notes and document contents
+            full_case_data = f"{case_notes}\n\n{uploaded_text_summary}"
 
             # OPTION 1: Gemini In-App Execution
             if engine_choice == "Gemini (Audit + Draft Discovery)":
@@ -96,7 +134,7 @@ with col2:
                 if not active_key:
                     st.error("No API key detected. Please enter your individual key or add the master key in the app settings.")
                 else:
-                    with st.spinner("Analyzing and drafting complete discovery package..."):
+                    with st.spinner("Analyzing case data and drafting targeted discovery package..."):
                         try:
                             genai.configure(api_key=active_key)
                             
@@ -109,20 +147,26 @@ with col2:
                             MANDATORY CHECKLIST FOR THIS CASE TYPE:
                             {selected_checklist}
                             
-                            CURRENT FILE STATUS / EVIDENCE IN HAND:
-                            {case_notes}
+                            CURRENT FILE STATUS, NOTES, AND EXTRACTED FILE TEXT:
+                            {full_case_data}
                             
                             TASK:
                             Part 1: Case Audit
-                            - Compare file status against the mandatory checklist. List each item as [COMPLETED] or [MISSING].
-                            - Identify vulnerabilities where the Defense Theory threatens liability.
+                            - Compare current file status against the mandatory checklist. List each item as [COMPLETED] or [MISSING].
+                            - Note any statute of limitations (SOL) threats or structural causation gaps.
+                            - Identify key vulnerabilities where the Defense Theory threatens liability.
                             
                             Part 2: Draft Targeted Discovery (Strictly bound by TRCP limits)
-                            Draft exactly the following number of requests based on {trcp_level}:
+                            Draft exactly the following number of items based on {trcp_level}:
                             {limit_text}
                             
-                            - Draft targeted admissions designed to force the defense to admit elements of negligence or trap them on the facts.
-                            - Ensure all drafted discovery is surgical, directly dismantling the defense theory, and complies with Texas civil procedure rules.
+                            - Your output MUST contain:
+                              1. Requests for Production (RFPs)
+                              2. Interrogatories (ROGs)
+                              3. Requests for Admissions (RFAs)
+                              4. Deposition Topics
+                            
+                            - Ensure every question is highly specific, completely surgical, and directly targets the elements required to dismantle the defense theory. Avoid generic boilerplate.
                             """
                             
                             model = genai.GenerativeModel("gemini-2.5-flash")
@@ -145,12 +189,12 @@ DEFENSE THEORY: {defense_theory}
 DISCOVERY LEVEL: {trcp_level}
 MANDATORY DISCOVERY CHECKLIST:
 {selected_checklist}
-EVIDENCE GATHERED:
-{case_notes}
+EVIDENCE CONTENT GATHERED:
+{full_case_data}
 
 INSTRUCTIONS:
 1. Conduct a gap analysis and pinpoint vulnerabilities related to the defense theory.
-2. Under the strict rules of {trcp_level}, draft exactly {limit_text} to secure the missing evidence.
+2. Under the strict limits of {trcp_level}, draft exactly {limit_text} to secure the missing evidence.
 3. Search Midpage case law for the best binding Texas precedent that defeats the defense theory, and cite it within the discovery strategy."""
                 
                 st.markdown("### Copy the prompt below and paste it directly into Claude:")
