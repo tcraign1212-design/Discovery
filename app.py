@@ -3,25 +3,25 @@ import io
 import docx
 from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from google import genai  # The modern SDK
+from google import genai
 from openai import OpenAI
 import anthropic
 import os
 
-# 1. PAGE CONFIGURATION
-st.set_page_config(page_title="Case Intelligence Brief Generator", layout="wide")
+# 1. PAGE CONFIG & SESSION STATE
+st.set_page_config(page_title="Case Intelligence Brief", layout="wide")
 if "brief_content" not in st.session_state:
     st.session_state["brief_content"] = ""
 
 st.title("Legal Utility: Case Intelligence Brief Generator")
 st.markdown("---")
 
-# 2. API KEY RESOLUTION
+# API Keys
 env_gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
 env_openai_key = st.secrets.get("OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY")
 env_anthropic_key = st.secrets.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
 
-# 3. DOCUMENT GENERATION
+# 2. DOCUMENT GENERATION
 def generate_brief_docx(text, title):
     doc = docx.Document()
     for s in doc.sections:
@@ -49,14 +49,14 @@ def generate_brief_docx(text, title):
     buf = io.BytesIO(); doc.save(buf); buf.seek(0)
     return buf
 
-# 4. PROMPT BUILDER
+# 3. PROMPT BUILDER
 def build_prompt(stage, ctype, dlevel, doi, sol, summary, gov, cv_jurisdiction):
     gov_txt = "\n- GOV FLAG: Apply TTCA analysis." if gov else ""
     cv_txt = f"\n- COMMERCIAL FLAG: Apply {cv_jurisdiction} analysis." if "Commercial" in ctype else ""
     params = f"Framework: {ctype}\nDOI: {doi}\nSOL: {sol}\n\nSummary:\n{summary}"
     return f"Draft Texas {'Pre-Suit Brief' if stage == 'Pre-Litigation' else 'Litigation Blueprint'}. {params} {gov_txt}{cv_txt}"
 
-# 5. MAIN LAYOUT
+# 4. MAIN LAYOUT
 col1, col2 = st.columns([2, 3])
 with col1:
     st.subheader("1. Case Details")
@@ -79,20 +79,19 @@ with col1:
     sol_in = st.text_input("SOL Date")
     run_brief = st.button("Generate Case Intelligence Brief", type="primary", use_container_width=True)
 
-# 6. OUTPUT PANEL
+# 5. OUTPUT PANEL
 with col2:
     st.subheader("2. Case Intelligence Brief")
     if run_brief:
         if not case_summary.strip() or not active_key:
-            st.warning("Veto: Provide a case summary and API key.")
+            st.warning("Veto: Provide summary and key.")
         else:
             prompt = build_prompt(case_stage, case_type, discovery_level, doi_in, sol_in, case_summary, government_entity, cv_jurisdiction)
             try:
                 if ai_engine == "Gemini (Google)":
                     with st.spinner("Gemini thinking..."):
-                        # Fix: Initialize modern client
+                        # Client uses the modern google-genai library
                         client = genai.Client(api_key=active_key)
-                        # Fix: Generate content using modern SDK path
                         response = client.models.generate_content(model="gemini-1.5-flash", contents=prompt)
                         st.session_state["brief_content"] = response.text
                 elif ai_engine == "ChatGPT (OpenAI)":
