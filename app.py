@@ -296,8 +296,21 @@ with col1:
     interstate_applies = False
     if commercial_vehicle:
         # These only appear if the box above is checked
-        interstate_applies = st.checkbox("Interstate Commerce (Full FMCSR)")
-        st.caption("Check this if the vehicle crossed state lines or carries interstate cargo.")
+
+    st.markdown("**Commercial Vehicle Status**")
+    commercial_status = st.radio(
+        "Does FMCSR / Commercial Regs apply?",
+        ["Confirmed Yes", "Confirmed No", "Unsure / Needs Analysis"],
+        index=2, # Defaults to "Unsure"
+        horizontal=True
+)
+
+# This variable then feeds into your build_prompt() function
+if commercial_status in ["Confirmed Yes", "Unsure / Needs Analysis"]:
+    # The code will now tell the AI to include the FMCSR Research section
+    include_fmcsr_analysis = True 
+else:
+    include_fmcsr_analysis = False
 
     # ── Case Summary ──
     case_summary = st.text_area(
