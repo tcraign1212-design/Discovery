@@ -141,23 +141,19 @@ with col1:
     
     # API Key Logic
     active_api_key = ""
-   if ai_engine == "Gemini (Google)":
-                with st.spinner("Analyzing via Gemini..."):
-                    try:
-                        genai.configure(api_key=active_api_key)
-                        
-                        # THIS IS THE MISSING DEFINITION:
-                        model = genai.GenerativeModel("gemini-1.5-flash") 
-                        
-                        response = model.generate_content(prompt)
-                        output_text = response.text
-                    except Exception as e:
-                        st.error(f"Gemini error: {e}")
+   # API Key Logic (Layout Only)
+    active_api_key = ""
+    if ai_engine == "Gemini (Google)":
+        active_api_key = st.text_input(
+            "Gemini API Key", value=env_gemini_key or "", type="password"
+        )
     elif ai_engine == "ChatGPT (OpenAI)":
-        active_api_key = st.text_input("OpenAI API Key", value=env_openai_key or "", type="password")
+        active_api_key = st.text_input(
+            "OpenAI API Key", value=env_openai_key or "", type="password"
+        )
     elif ai_engine == "Claude (Anthropic)":
         active_api_key = st.text_input("Anthropic API Key", value=env_anthropic_key or "", type="password")
-
+        )
     st.markdown("---")
 
     case_type = st.selectbox("Case Type / Framework:", ["Standard MVA", "Commercial Trucking", "Premises Liability", "Workplace Injury", "UM/UIM", "TTCA"])
@@ -197,31 +193,106 @@ with col1:
 with col2:
     st.subheader("2. Case Intelligence Brief")
 
+    # The gatekeeper: only runs if the user clicks the primary button
     if run_brief:
         if not case_summary.strip():
-            st.warning("Please provide a case summary.")
+            st.warning("Please provide a case summary before generating.")
         elif not active_api_key:
-            st.error("Missing API Key.")
+            st.error(f"Please enter an API key for {ai_engine}.")
         else:
-            prompt = build_prompt(case_stage, case_type, discovery_level, date_of_incident, sol_date, case_summary, government_entity, include_fmcsr_analysis)
-            
-            output_text = ""
-            # API Calls (Simplified for brevity)
-            if ai_engine == "Gemini (Google)":
-                with st.spinner("Gemini analyzing..."):
-                    genai.configure(api_key=active_api_key)
-                    model = genai.GenerativeModel("gemini-1.5-flash")
-                    response = model.generate_content(prompt)
-                    output_text = response.text
-            # [Add OpenAI/Claude blocks here similarly]
+            # 1. Build the prompt using variables defined in Section 5
+            prompt = build_prompt(
+                case_stage=case_stage,
+                case_type=case_type,
+                discovery_level=discovery_level,
+                date_of_incident=date_of_incident,
+                sol_date=sol_date,
+                case_summary=case_summary,
+                government_entity=government_entity,
+                include_fmcsr=include_fmcsr_analysis  # Using the Trucking logic variable
+            )
 
+            output_text = ""
+
+            # 2. API Execution Sieve
+            if ai_engine == "Gemini (Google)":
+                with st.spinner("Analyzing via Gemini..."):
+                    try:
+                        genai.configure(api_key=active_api_key)
+                        # Define the specific model engine here
+                        model = genai.GenerativeModel("gemini-1.5-flash")
+                        response = model.generate_content(prompt)
+                        output_text = response.text
+                    except Exception as e:
+                        st.error(f"Gemini error: {e}")
+
+            elif ai_engine == "ChatGPT (OpenAI)":
+                with st.spinner("Analyzing via OpenAI..."):
+                    try:
+                        client = OpenAI(api_key=active_api_key)
+                        response = client.chat.completions.create(
+                            model="gpt-4o",
+                            messages=[{"role": "user", "content": prompt}],
+                        )
+                        output_text = response.choices[0].message.content
+                    except Exception as e:
+                        st.error(f"OpenAI error: {e}")
+
+            elif ai_engine == "Claude (Anthropic)":
+                with st.spinner("Analyzing via Claude..."):
+                    try:
+                        client = anthropic.Anthropic(api_key=active_api_key)
+                        response = client.messages.create(
+                            model="claude-3-5-sonnet-20240620",
+                            max_tokens=4000,
+                            messages=[{"role": "user", "content": prompt}],
+                        )
+                        output_text = response.content[0].text
+                    except Exception as e:
+                        st.error(f"Claude error: {e}")
+
+            # 3. Session State Management
             if output_text:
                 st.session_state["brief_content"] = output_text
-                st.session_state["brief_stage"] = case_stage
+                st.session_state["brief_stage"]   = case_stage
 
+    # ── Editable Output Area (Persistent via Session State) ──
     if "brief_content" in st.session_state:
-        edited_text = st.text_area("Edit before exporting:", value=st.session_state["brief_content"], height=500)
+        stage_label = st.session_state.get("brief_stage", "")
+        doc_title = (
+            "PRE-LITIGATION CASE INTELLIGENCE BRIEF"
+            if stage_label == "Pre-Litigation"
+            else "LITIGATION CASE INTELLIGENCE BRIEF"
+        )
+
+        st.info(
+            "Review and edit the brief below. Use Section 5 output as your prompt prefix "
+            "when drafting discovery requests in Claude or Midpage."
+        )
+
+        # Update session state as the user types/edits
+        edited_text = st.text_area(
+            "Edit before exporting:",
+            value=st.session_state["brief_content"],
+            height=500,
+        )
         st.session_state["brief_content"] = edited_text
+
+        st.markdown("### Export")
         
-        docx_data = generate_brief_docx(st.session_state["brief_content"], "CASE INTELLIGENCE BRIEF")
-        st.download_button(label="📥 Download (.docx)", data=docx_data, file_name="Case_Brief.docx", use_container_width=True)
+        # Generate the .docx buffer using your Section 3 function
+        docx_data = generate_brief_docx(st.session_state["brief_content"], doc_title)
+        
+        st.download_button(
+            label="📥 Download Case Intelligence Brief (.docx)",
+            data=docx_data,
+            file_name=f"{'Pre_Lit' if stage_label == 'Pre-Litigation' else 'Litigation'}_Brief.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            use_container_width=True,
+        )
+
+        st.markdown("---")
+        st.caption(
+            "**Strategic Note:** This brief acts as a filter for causation gaps and insurance "
+            "discrepancies. Ensure all proof items are verified before filing."
+        )
