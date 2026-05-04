@@ -99,3 +99,311 @@ V33 = "Plaintiff objects to this request to the extent it seeks information rega
 V34 = "Plaintiff objects to the extent this request improperly expands the burden of medical billing disclosure by requiring the creation of an itemized analysis beyond the records themselves."
 V35 = "Plaintiff objects to the extent this request seeks a premature, exhaustive, or artificially fixed statement of damages before discovery is fully developed."
 V36 = "Plaintiff objects because this request for admission improperly seeks to establish a disputed merits issue rather than narrow an uncontroverted fact."
+V37 = "Plaintiff objects because this request for admission is compound and does not permit a fair admission or denial of a single proposition."
+V38 = "Plaintiff objects to this request for admission to the extent it seeks a pure legal conclusion."
+V39 = "After reasonable inquiry, Plaintiff lacks sufficient information to admit or deny this request and therefore denies it."
+V40 = "Plaintiff objects to the use of highly subjective or prejudicial terms within the request to the extent they assume a disputed characterization of the incident."
+V41 = "Plaintiff objects because the request for all written complaints across unrelated matters is overly broad, vague, and constitutes a prohibited fishing expedition."
+V42 = "Plaintiff objects to the extent the requested authorization would permit ex parte communications with healthcare providers rather than the production of defined records."
+
+# Map cleanly using variables
+TAXONOMY_OBJECTIONS[K1] = V1
+TAXONOMY_OBJECTIONS[K2] = V2
+TAXONOMY_OBJECTIONS[K3] = V3
+TAXONOMY_OBJECTIONS[K4] = V4
+TAXONOMY_OBJECTIONS[K5] = V5
+TAXONOMY_OBJECTIONS[K6] = V6
+TAXONOMY_OBJECTIONS[K7] = V7
+TAXONOMY_OBJECTIONS[K8] = V8
+TAXONOMY_OBJECTIONS[K9] = V9
+TAXONOMY_OBJECTIONS[K10] = V10
+TAXONOMY_OBJECTIONS[K11] = V11
+TAXONOMY_OBJECTIONS[K12] = V12
+TAXONOMY_OBJECTIONS[K13] = V13
+TAXONOMY_OBJECTIONS[K14] = V14
+TAXONOMY_OBJECTIONS[K15] = V15
+TAXONOMY_OBJECTIONS[K16] = V16
+TAXONOMY_OBJECTIONS[K17] = V17
+TAXONOMY_OBJECTIONS[K18] = V18
+TAXONOMY_OBJECTIONS[K19] = V19
+TAXONOMY_OBJECTIONS[K20] = V20
+TAXONOMY_OBJECTIONS[K21] = V21
+TAXONOMY_OBJECTIONS[K22] = V22
+TAXONOMY_OBJECTIONS[K23] = V23
+TAXONOMY_OBJECTIONS[K24] = V24
+TAXONOMY_OBJECTIONS[K25] = V25
+TAXONOMY_OBJECTIONS[K26] = V26
+TAXONOMY_OBJECTIONS[K27] = V27
+TAXONOMY_OBJECTIONS[K28] = V28
+TAXONOMY_OBJECTIONS[K29] = V29
+TAXONOMY_OBJECTIONS[K30] = V30
+TAXONOMY_OBJECTIONS[K31] = V31
+TAXONOMY_OBJECTIONS[K32] = V32
+TAXONOMY_OBJECTIONS[K33] = V33
+TAXONOMY_OBJECTIONS[K34] = V34
+TAXONOMY_OBJECTIONS[K35] = V35
+TAXONOMY_OBJECTIONS[K36] = V36
+TAXONOMY_OBJECTIONS[K37] = V37
+TAXONOMY_OBJECTIONS[K38] = V38
+TAXONOMY_OBJECTIONS[K39] = V39
+TAXONOMY_OBJECTIONS[K40] = V40
+TAXONOMY_OBJECTIONS[K41] = V41
+TAXONOMY_OBJECTIONS[K42] = V42
+
+
+# --- DOCUMENT GENERATION FUNCTIONS ---
+
+def convert_pdf_text_to_docx(pdf_file):
+    reader = PdfReader(pdf_file)
+    doc = docx.Document()
+    for section in doc.sections:
+        section.top_margin = Inches(1)
+        section.bottom_margin = Inches(1)
+        section.left_margin = Inches(1)
+        section.right_margin = Inches(1)
+
+    style_normal = doc.styles['Normal']
+    font = style_normal.font
+    font.name = 'Times New Roman'
+    font.size = Pt(12)
+
+    for i, page in enumerate(reader.pages):
+        page_text = page.extract_text()
+        if page_text:
+            lines = page_text.split('\n')
+            for line in lines:
+                cleaned_line = line.strip()
+                if cleaned_line:
+                    doc.add_paragraph(cleaned_line)
+        else:
+            doc.add_paragraph(f"[Page {i+1} contained no directly extractable text]")
+            
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+
+def generate_response_docx(content_text):
+    doc = docx.Document()
+    
+    for section in doc.sections:
+        section.top_margin = Inches(1)
+        section.bottom_margin = Inches(1)
+        section.left_margin = Inches(1)
+        section.right_margin = Inches(1)
+
+    style_normal = doc.styles['Normal']
+    font = style_normal.font
+    font.name = 'Times New Roman'
+    font.size = Pt(12)
+
+    p_title = doc.add_paragraph()
+    p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_title.paragraph_format.space_after = Pt(6)
+    run_title = p_title.add_run("PLAINTIFF’S RESPONSES AND OBJECTIONS TO DEFENDANT’S DISCOVERY")
+    run_title.font.bold = True
+    run_title.font.size = Pt(12)
+    
+    p_sep = doc.add_paragraph()
+    p_sep.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_sep.paragraph_format.space_after = Pt(18)
+    p_sep.add_run("______________________________________________________________________")
+
+    lines = content_text.split('\n')
+    for line in lines:
+        cleaned_line = line.strip()
+        if not cleaned_line:
+            continue
+            
+        p = doc.add_paragraph()
+        p.paragraph_format.space_after = Pt(12)
+        p.paragraph_format.line_spacing = 1.15
+        
+        if cleaned_line.startswith('#'):
+            cleaned_line = cleaned_line.replace('#', '').strip()
+
+        upper_line = cleaned_line.upper()
+
+        is_discovery_header = (
+            upper_line.startswith("INTERROGATORY") or 
+            upper_line.startswith("REQUEST NO") or 
+            upper_line.startswith("REQUEST FOR PRODUCTION")
+        )
+
+        is_answer_header = (
+            upper_line.startswith("ANSWER") or 
+            upper_line.startswith("RESPONSE")
+        )
+
+        if is_discovery_header:
+            run = p.add_run(cleaned_line)
+            run.font.bold = True
+            p.paragraph_format.space_before = Pt(14)
+            p.paragraph_format.space_after = Pt(4)
+            
+        elif is_answer_header:
+            run = p.add_run(cleaned_line)
+            run.font.bold = True
+            p.paragraph_format.left_indent = Inches(0.25)
+            p.paragraph_format.space_after = Pt(6)
+            
+        elif "**" in cleaned_line:
+            parts = cleaned_line.split('**')
+            for index, part in enumerate(parts):
+                if index % 2 == 1:
+                    run = p.add_run(part)
+                    run.font.bold = True
+                else:
+                    run = p.add_run(part)
+        else:
+            p.add_run(cleaned_line)
+
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+
+# 3. Streamlit Tab UI
+tab1, tab2 = st.tabs(["📄 Convert PDF to Word", "⚖️ Discovery Response Drafter"])
+
+# --- TAB 1: PDF TO WORD ---
+with tab1:
+    st.subheader("Direct PDF to Word Converter")
+    st.info("Upload any plain text PDF to convert it directly into an editable Word (.docx) file.")
+    
+    uploaded_pdf = st.file_uploader("Upload PDF File", type=["pdf"])
+    
+    if uploaded_pdf:
+        with st.spinner("Parsing PDF text and building Word document..."):
+            docx_buffer = convert_pdf_text_to_docx(uploaded_pdf)
+            st.success("Conversion successful!")
+            
+            base_name = os.path.splitext(uploaded_pdf.name)[0]
+            st.download_button(
+                label=f"📥 Download '{base_name}.docx'",
+                data=docx_buffer,
+                file_name=f"{base_name}.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
+
+# --- TAB 2: DISCOVERY RESPONSE DRAFTER ---
+with tab2:
+    col1, col2 = st.columns([1, 1])
+
+    with col1:
+        st.subheader("1. Setup Objections & Workflow")
+        
+        ai_engine = st.radio(
+            "Select Inference Model Engine:",
+            ["Gemini (Google)", "ChatGPT (OpenAI)"],
+            horizontal=True
+        )
+        
+        user_api_key = st.text_input(
+            f"Required: Enter your personal {ai_engine} API Key",
+            type="password",
+            placeholder="Key is not logged or stored"
+        )
+        
+        st.markdown("---")
+        
+        request_type = st.selectbox(
+            "Discovery Type", 
+            ["Requests for Production (RFPs)", "Interrogatories (ROGs)", "Requests for Admissions (RFAs)"]
+        )
+        
+        selected_objections = st.multiselect(
+            "Select Candidate Objections to Screen & Apply:",
+            list(TAXONOMY_OBJECTIONS.keys())
+        )
+        
+        incoming_request = st.text_area(
+            "Paste Defendant's Exact Question",
+            height=130,
+            placeholder="e.g., Interrogatory No. 1: Please state your full name..."
+        )
+        
+        factual_basis = st.text_area(
+            "Enter Factual Answer/Response details",
+            height=100,
+            placeholder="What actually occurred or what do we have?"
+        )
+        
+        run_button = st.button("Generate Final Discovery Response", type="primary")
+
+    with col2:
+        st.subheader("2. Live Response Preview")
+        
+        if run_button:
+            if not incoming_request:
+                st.warning("Please paste the defendant's request first.")
+            elif not user_api_key:
+                st.error(f"Please provide your personal {ai_engine} API Key.")
+            else:
+                objection_text = "\n".join([f"- {TAXONOMY_OBJECTIONS[obj]}" for obj in selected_objections])
+                
+                prompt = f"""You are a meticulous legal discovery drafting engine. Your job is to output a direct legal response.
+
+INCOMING REQUEST TYPE: {request_type}
+DEFENDANT'S REQUEST:
+"{incoming_request}"
+
+PLAINTIFF'S FACTUAL RESPONSE:
+"{factual_basis if factual_basis else "Plaintiff has provided no additional information at this time."}"
+
+THE SELECTED CANDIDATE OBJECTIONS TO APPLY:
+{objection_text if objection_text else "None."}
+
+STRICT RESPONSE RULES:
+1. Avoid general opening context statements or conversation. Do not say "Here is your response".
+2. Do not use Markdown formatting characters like '#' or '*' in your output unless wrapping a heading.
+3. First, type out the exact text of the relevant objections applied.
+4. Directly after the objections, output: "**Subject to and without waiving the foregoing, Plaintiff responds as follows:**"
+5. Add the factual response text.
+"""
+                
+                output_text = ""
+                
+                if ai_engine == "Gemini (Google)":
+                    with st.spinner("Processing objections via Gemini..."):
+                        try:
+                            genai.configure(api_key=user_api_key)
+                            model = genai.GenerativeModel("gemini-2.5-flash")
+                            response = model.generate_content(prompt)
+                            output_text = response.text
+                        except Exception as e:
+                            st.error(f"Error calling Gemini AI: {e}")
+                                
+                elif ai_engine == "ChatGPT (OpenAI)":
+                    with st.spinner("Processing objections via ChatGPT..."):
+                        try:
+                            client = OpenAI(api_key=user_api_key)
+                            response = client.chat.completions.create(
+                                model="gpt-4o",
+                                messages=[{"role": "user", "content": prompt}]
+                            )
+                            output_text = response.choices[0].message.content
+                        except Exception as e:
+                            st.error(f"Error calling ChatGPT AI: {e}")
+                
+                if output_text:
+                    st.success("Draft Generated Successfully")
+                    st.session_state["last_responder_output"] = output_text
+
+        if "last_responder_output" in st.session_state:
+            output_text = st.session_state["last_responder_output"]
+            
+            st.markdown("### Export Word Document")
+            docx_data = generate_response_docx(output_text)
+            st.download_button(
+                label="📥 Download Word File (.docx)",
+                data=docx_data,
+                file_name="Compliant_Discovery_Response.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                use_container_width=True
+            )
+            
+            st.markdown("---")
+            st.markdown(output_text)
