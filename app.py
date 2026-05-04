@@ -92,7 +92,7 @@ with col2:
                     with st.spinner("Gemini thinking..."):
                         # Client uses the modern google-genai library
                         client = genai.Client(api_key=active_key)
-                        response = client.models.generate_content(model="gemini-1.5-flash", contents=prompt)
+                        response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
                         st.session_state["brief_content"] = response.text
                 elif ai_engine == "ChatGPT (OpenAI)":
                     with st.spinner("OpenAI thinking..."):
