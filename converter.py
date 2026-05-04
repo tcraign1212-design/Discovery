@@ -200,7 +200,7 @@ TAXONOMY_OBJECTIONS = {
     )
 }
 
-# --- DOCUMENT GENERATION FUNCTIONS ---
+# --- IMPROVED DOCUMENT GENERATION ENGINE ---
 
 def convert_pdf_text_to_docx(pdf_file):
     reader = PdfReader(pdf_file)
@@ -234,6 +234,10 @@ def convert_pdf_text_to_docx(pdf_file):
 
 
 def generate_response_docx(content_text):
+    """
+    Builds a pristine, court-ready discovery document. 
+    Strips markdown artifacts, handles headers, and applies bolding cleanly.
+    """
     doc = docx.Document()
     for section in doc.sections:
         section.top_margin = Inches(1)
@@ -246,26 +250,50 @@ def generate_response_docx(content_text):
     font.name = 'Times New Roman'
     font.size = Pt(12)
 
+    # 1. Title Block
     p_title = doc.add_paragraph()
     p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_title.paragraph_format.space_after = Pt(6)
     run_title = p_title.add_run("PLAINTIFF’S RESPONSES AND OBJECTIONS TO DEFENDANT’S DISCOVERY")
     run_title.font.bold = True
-    run_title.font.size = Pt(13)
+    run_title.font.size = Pt(12)
     
-    doc.add_paragraph("______________________________________________________________________")
-    doc.add_paragraph()
+    # 2. Add separator rule line
+    p_sep = doc.add_paragraph()
+    p_sep.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_sep.paragraph_format.space_after = Pt(12)
+    p_sep.add_run("______________________________________________________________________")
 
+    # 3. Clean line parsing
     lines = content_text.split('\n')
     for line in lines:
         cleaned_line = line.strip()
         if not cleaned_line:
             continue
+            
         p = doc.add_paragraph()
+        p.paragraph_format.space_after = Pt(10)
+        p.paragraph_format.line_spacing = 1.15
+        
+        # Check for Markdown Heading formatting (e.g. ### Header or ## Header)
         if cleaned_line.startswith('###') or cleaned_line.startswith('##'):
-            run = p.add_run(cleaned_line.replace('#', '').strip())
+            text_run = cleaned_line.replace('#', '').strip()
+            run = p.add_run(text_run)
             run.font.bold = True
+            
+        # Check for inline double asterisks **Text**
+        elif '**' in cleaned_line:
+            # Tokenize line to extract text that should be bolded
+            parts = cleaned_line.split('**')
+            for index, part in enumerate(parts):
+                if index % 2 == 1:  # Inside asterisks -> make bold
+                    run = p.add_run(part)
+                    run.font.bold = True
+                else:  # Outside asterisks -> normal text
+                    run = p.add_run(part)
         else:
-            run = p.add_run(cleaned_line)
+            # Standard output
+            p.add_run(cleaned_line)
 
     buffer = io.BytesIO()
     doc.save(buffer)
@@ -303,7 +331,6 @@ with tab2:
     with col1:
         st.subheader("1. Setup Objections & Workflow")
         
-        # User explicitly adds their API Key in the UI
         ai_engine = st.radio(
             "Select Inference Model Engine:",
             ["Gemini (Google)", "ChatGPT (OpenAI)"],
@@ -313,7 +340,7 @@ with tab2:
         user_api_key = st.text_input(
             f"Required: Enter your personal {ai_engine} API Key",
             type="password",
-            placeholder="Key will not be logged or saved to the server"
+            placeholder="Key is not logged or stored"
         )
         
         st.markdown("---")
@@ -331,13 +358,13 @@ with tab2:
         incoming_request = st.text_area(
             "Paste Defendant's Exact Question",
             height=130,
-            placeholder="e.g., Request No. 4: Produce any and all documents relating to any prior motor vehicle accidents..."
+            placeholder="e.g., Interrogatory No. 1: Please state your full name..."
         )
         
         factual_basis = st.text_area(
             "Enter Factual Answer/Response details",
             height=100,
-            placeholder="What actually occurred or what do we have? e.g., Plaintiff has had no prior motor vehicle accidents."
+            placeholder="What actually occurred or what do we have?"
         )
         
         run_button = st.button("Generate Final Discovery Response", type="primary")
@@ -351,36 +378,35 @@ with tab2:
             elif not user_api_key:
                 st.error(f"Please provide your personal {ai_engine} API Key.")
             else:
-                # Core prompting instruction logic
                 objection_text = "\n".join([f"- {TAXONOMY_OBJECTIONS[obj]}" for obj in selected_objections])
                 
+                # Strict drafting layout via engineering prompt
                 prompt = f"""
-                You are an expert defense-minded legal auditor and personal injury discovery responder.
+                You are a meticulous legal discovery drafting engine. Your job is to output a direct legal response.
 
-                INCOMING DISCOVERY REQUEST TYPE: {request_type}
+                INCOMING REQUEST TYPE: {request_type}
                 DEFENDANT'S REQUEST:
                 "{incoming_request}"
 
                 PLAINTIFF'S FACTUAL RESPONSE:
-                "{factual_basis if factual_basis else "No additional facts provided. Subject to objections, respond within normal limits."}"
+                "{factual_basis if factual_basis else "Plaintiff has provided no additional information at this time."}"
 
-                THE SELECTED CANDIDATE OBJECTIONS TO EVALUATE:
-                {objection_text if objection_text else "No specific candidate objections selected. Evaluate if any general objections are required under TRCP rules."}
+                THE SELECTED CANDIDATE OBJECTIONS TO APPLY:
+                {objection_text if objection_text else "None."}
 
-                TASK & STRICT RULES:
-                1. **Objection Veto Sieve:** Screen the Candidate Objections against the incoming request text. If any objection is irrelevant to the request, drop it entirely.
-                2. **Drafting Format:**
-                   - First, write the exact text of any surviving objections.
-                   - Immediately following the objections, output the exact phrase: "**Subject to and without waiving the foregoing, Plaintiff responds as follows:**"
-                   - Follow that transition with the factual answer text.
-                3. **Fallback Rule:** If no candidate objections were selected or all were vetoed, skip the objections and the transition phrase, and provide the factual answer directly.
+                STRICT RESPONSE RULES:
+                1. Avoid general opening context statements or conversation. Do not say "Here is your response".
+                2. Do not use Markdown formatting characters like '#' or '*' in your output unless wrapping a heading.
+                3. First, type out the exact text of the relevant objections applied.
+                4. Directly after the objections, output: "**Subject to and without waiving the foregoing, Plaintiff responds as follows:**"
+                5. Add the factual response text.
                 """
                 
                 output_text = ""
                 
                 # Execute inference using the explicit User Key
                 if ai_engine == "Gemini (Google)":
-                    with st.spinner("Processing objections through Gemini Veto Sieve..."):
+                    with st.spinner("Processing objections via Gemini..."):
                         try:
                             genai.configure(api_key=user_api_key)
                             model = genai.GenerativeModel("gemini-2.5-flash")
@@ -390,7 +416,7 @@ with tab2:
                             st.error(f"Error calling Gemini AI: {e}")
                                 
                 elif ai_engine == "ChatGPT (OpenAI)":
-                    with st.spinner("Processing objections through ChatGPT Veto Sieve..."):
+                    with st.spinner("Processing objections via ChatGPT..."):
                         try:
                             client = OpenAI(api_key=user_api_key)
                             response = client.chat.completions.create(
