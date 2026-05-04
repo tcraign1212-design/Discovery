@@ -252,5 +252,5 @@ def generate_response_docx(content_text, include_styling_box=False, style_detail
         upper_line = cleaned_line.upper()
 
         # Target dynamic headers directly
-        is_discovery_header = (
+        is_discovery_header = ()
             "INTERROGATORY NO" in upper_line or
