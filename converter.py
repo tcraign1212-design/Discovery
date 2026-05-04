@@ -7,7 +7,7 @@ from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from pypdf import PdfReader
 import google.generativeai as genai
-from OpenAI import OpenAI
+from openai import OpenAI
 
 # 1. Page Configuration
 st.set_page_config(page_title="Discovery Drafter & Utility", layout="wide")
