@@ -129,7 +129,8 @@ with col2:
             st.error(f"Please enter an API key for {ai_engine} above.")
         else:
             prompt = f"""
-            You are an expert personal injury litigation analyst and workflow strategist. Your task is to perform an objective case readiness review and draft case-specific, high-utility discovery requests.
+            You are an expert personal injury litigation analyst and master discovery drafter. 
+            Your task is to perform an objective case review and draft highly detailed, case-specific discovery requests categorized exactly like formal Texas litigation requests.
 
             CASE PARAMETERS:
             - Framework Type: {case_type}
@@ -142,13 +143,16 @@ with col2:
 
             RULES & DIRECTIVES:
             1. Focus strictly on critical chronology, liability exposure, and strategic proof. Do not over-index on damages unless directly relevant to liability proof.
-            2. For discovery, DO NOT include questions or requests covered under TRCP Rule 194.2 Required Disclosures (e.g., no requests for basic insurance dec sheets, witness contact info, or medical records). Focus on liability mechanics, maintenance history, cell phone usage, and scene evidence.
-            3. Limit discovery items to 3 case-specific Interrogatories and 3 targeted Requests for Production that directly address the weaknesses in the fact pattern.
-            4. Structure the output clearly using these headers:
-               - ## 1. Chronology & Case Metrics
-               - ## 2. Merits & Liability Exposure Analysis
-               - ## 3. Targeted Pre-Litigation Steps
-               - ## 4. Custom Discovery Requests (Excludes Initial Disclosures)
+            2. For discovery, DO NOT include items covered under TRCP Rule 194.2 Required Disclosures. 
+            3. Limit requests to exactly 3 case-specific Interrogatories and 3 targeted Requests for Production that directly address the gaps in the fact pattern.
+            4. Format discovery with clear, topical category headers just like a formal request (e.g., 'Defendant's Conduct at the Time of the Collision', 'Causation & Background').
+            5. Ensure questions are highly descriptive, formal, and thorough—not generic.
+
+            Structure the output clearly using these exact headers:
+            - ## 1. Chronology & Case Metrics
+            - ## 2. Merits & Liability Exposure Analysis
+            - ## 3. Targeted Pre-Litigation Steps
+            - ## 4. Custom Discovery Requests (Excludes Initial Disclosures)
             """
             
             output_text = ""
