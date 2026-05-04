@@ -84,45 +84,20 @@ def build_prompt(stage, ctype, dlevel, doi, sol, summary, gov, cv_jurisdiction):
 # ──────────────────────────────────────────────
 # 4. MAIN LAYOUT
 # ──────────────────────────────────────────────
-col1, col2 = st.columns([2, 3])
-
-with col1:
-    st.subheader("1. Case Details")
-    case_stage = st.radio("Case Stage:", ["Pre-Litigation", "Active Litigation"], horizontal=True)
-    ai_engine = st.radio("Model Engine:", ["Gemini (Google)", "ChatGPT (OpenAI)", "Claude (Anthropic)"], horizontal=True)
-
-    # Key Persistence
-    if ai_engine == "Gemini (Google)":
-        active_key = st.text_input("Gemini API Key", value=env_gemini_key or "", type="password")
-    elif ai_engine == "ChatGPT (OpenAI)":
-        active_key = st.text_input("OpenAI API Key", value=env_openai_key or "", type="password")
-    else:
-        active_key = st.text_input("Anthropic API Key", value=env_anthropic_key or "", type="password")
-
-    st.markdown("---")
+def build_prompt(stage, ctype, dlevel, doi, sol, summary, gov, cv_jurisdiction):
+    gov_txt = "\n- GOV FLAG: Apply TTCA analysis/notice deadlines." if gov else ""
     
-    # ADDED "Commercial Vehicle" TO THE DROPDOWN LIST HERE
-    case_type = st.selectbox(
-        "Framework:", 
-        ["Standard MVA", "Commercial Vehicle", "Trucking", "Premises", "Workplace", "UM/UIM", "TTCA"]
-    )
+    # Restored logic for Commercial Vehicle / Trucking flags
+    cv_analysis = ""
+    if ctype in ["Trucking", "Commercial Vehicle"]:
+        jurisdiction = f"Jurisdiction: {cv_jurisdiction}"
+        cv_analysis = f"\n- {ctype.upper()} FLAG: Apply {jurisdiction} analysis. Focus on driver logs, qualification files, and vehicle maintenance under relevant FMCSR/TX-DOT standards."
     
-    discovery_level = "Level 2"
-    if case_stage == "Active Litigation":
-        discovery_level = st.radio("Discovery Level:", ["Level 1", "Level 2", "Level 3"], index=1, horizontal=True)
-
-    st.markdown("**Risk Flags**")
-    government_entity = st.checkbox("Government Entity Involved")
+    params = f"Framework: {ctype}\nDOI: {doi}\nSOL: {sol}\nGov: {gov}\n\nSummary:\n{summary}"
     
-    # REMOVED the separate commercial status radio button to keep the UI clean
-
-    case_summary = st.text_area("Case Summary", height=160)
-    
-    with st.expander("Dates"):
-        date_of_incident = st.text_input("Incident Date", placeholder="YYYY-MM-DD")
-        sol_date = st.text_input("SOL Date", placeholder="YYYY-MM-DD")
-
-    run_brief = st.button("Generate Case Intelligence Brief", type="primary", use_container_width=True)
+    if stage == "Pre-Litigation":
+        return f"Draft Texas Pre-Suit Brief. {params} {gov_txt}{cv_analysis} Headers: ## 1. Chronology, ## 2. Liability, ## 3. Risk Flags, ## 4. Proof Gaps, ## 5. Defense Anticipation, ## 6. Action Items."
+    return f"Draft Texas Litigation Blueprint. {params} Discovery: {dlevel} {gov_txt}{cv_analysis} Headers: ## 1. Chronology, ## 2. Liability, ## 3. Proof Gaps, ## 4. Defense Anticipation, ## 5. Discovery Blueprint, ## 6. Strategic Flags."
 
 # ──────────────────────────────────────────────
 # 5. OUTPUT PANEL
