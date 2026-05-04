@@ -62,7 +62,7 @@ K40 = "OB-TX-040: Prejudicial Terms / Controverted Text"
 K41 = "OB-TX-041: All Written Complaints (Overbroad)"
 K42 = "OB-TX-042: Ex Parte Provider Communications"
 
-# Dynamic Value Assignments
+# Mapping Values
 V1 = "Plaintiff objects to this request under TRCP 193.2 to the extent it seeks information not relevant to any party's claim or defense and is not within the permissible scope of discovery."
 V2 = "Plaintiff objects that this request is overly broad because it is not reasonably limited in time to the matters at issue in this litigation."
 V3 = "Plaintiff objects that this request is overly broad because it is not reasonably tailored to include only matters relevant to the issues in dispute."
@@ -106,7 +106,6 @@ V40 = "Plaintiff objects to the use of highly subjective or prejudicial terms wi
 V41 = "Plaintiff objects because the request for all written complaints across unrelated matters is overly broad, vague, and constitutes a prohibited fishing expedition."
 V42 = "Plaintiff objects to the extent the requested authorization would permit ex parte communications with healthcare providers rather than the production of defined records."
 
-# Map keys to strings
 TAXONOMY_OBJECTIONS[K1] = V1
 TAXONOMY_OBJECTIONS[K2] = V2
 TAXONOMY_OBJECTIONS[K3] = V3
@@ -232,7 +231,7 @@ def generate_response_docx(content_text, include_styling_box=False, style_detail
     run_title.font.bold = True
     run_title.font.size = Pt(12)
 
-    # Identifiers for structural regex matching
+    # Patterns matching subparts: e.g., 'a. ', 'b. ', '(a) ', '(b) '
     subpart_regex = re.compile(r'^(?:[a-g1-9]\.|\([a-g1-9]\))\s')
 
     lines = content_text.split('\n')
@@ -245,40 +244,56 @@ def generate_response_docx(content_text, include_styling_box=False, style_detail
         p.paragraph_format.space_after = Pt(12)
         p.paragraph_format.line_spacing = 1.15
         
+        # Strip internal markers if passed down
         if cleaned_line.startswith('#'):
             cleaned_line = cleaned_line.replace('#', '').strip()
 
         upper_line = cleaned_line.upper()
 
-        is_discovery_header = (
-            "INTERROGATORY NO" in upper_line or 
-            "REQUEST NO" in upper_line or 
-            "REQUEST FOR PRODUCTION NO" in upper_line or 
-            "REQUEST FOR ADMISSION NO" in upper_line
-        )
+        # Target absolute formatting matches
+        is_discovery_item = False
+        is_answer_item = False
 
-        is_answer_header = (
-            upper_line.startswith("ANSWER") or 
-            upper_line.startswith("RESPONSE")
-        )
+        # Specific keyword matching
+        if "INTERROGATORY NO." in upper_line:
+            is_discovery_item = True
+        elif "REQUEST FOR PRODUCTION NO." in upper_line:
+            is_discovery_item = True
+        elif "REQUEST FOR ADMISSION NO." in upper_line:
+            is_discovery_item = True
+        elif upper_line.startswith("ANSWER:") or upper_line.startswith("RESPONSE:"):
+            is_answer_item = True
 
-        # Dynamic formatting styles
-        if is_discovery_header:
-            run = p.add_run(cleaned_line)
-            run.font.bold = True
+        if is_discovery_item:
+            # Parse prefix vs rest of the query
+            parts = re.split(r'(?i)(INTERROGATORY NO\.\s*\d+:|REQUEST FOR PRODUCTION NO\.\s*\d+:|REQUEST FOR ADMISSION NO\.\s*\d+:)', cleaned_line)
+            for part in parts:
+                p_part = part.strip()
+                if not p_part:
+                    continue
+                if any(x in p_part.upper() for x in ["INTERROGATORY", "REQUEST FOR PRODUCTION", "REQUEST FOR ADMISSION"]):
+                    run = p.add_run(part + " ")
+                    run.font.bold = True
+                else:
+                    p.add_run(part)
             p.paragraph_format.space_before = Pt(14)
             p.paragraph_format.space_after = Pt(4)
-            
-        elif is_answer_header:
+
+        elif is_answer_item:
             run = p.add_run(cleaned_line)
             run.font.bold = True
-            p.paragraph_format.left_indent = Inches(0.25)
+            p.paragraph_format.left_indent = Inches(0)
+            p.paragraph_format.space_before = Pt(6)
             p.paragraph_format.space_after = Pt(6)
 
-        # Explicitly indent any subparts by .5"
         elif subpart_regex.match(cleaned_line):
+            # Indent exactly .5" per request
             p.paragraph_format.left_indent = Inches(0.5)
             p.paragraph_format.space_after = Pt(4)
+            p.add_run(cleaned_line)
+
+        else:
+            # Standard output format fallback
             if "**" in cleaned_line:
                 parts = cleaned_line.split('**')
                 for index, part in enumerate(parts):
@@ -288,17 +303,6 @@ def generate_response_docx(content_text, include_styling_box=False, style_detail
                         p.add_run(part)
             else:
                 p.add_run(cleaned_line)
-                
-        elif "**" in cleaned_line:
-            parts = cleaned_line.split('**')
-            for index, part in enumerate(parts):
-                if index % 2 == 1:
-                    run = p.add_run(part)
-                    run.font.bold = True
-                else:
-                    run = p.add_run(part)
-        else:
-            p.add_run(cleaned_line)
 
     buffer = io.BytesIO()
     doc.save(buffer)
