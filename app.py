@@ -13,12 +13,11 @@ import os
 # ──────────────────────────────────────────────
 st.set_page_config(page_title="Case Intelligence Brief", layout="wide")
 
-# Ensure brief content persists through reruns
 if "brief_content" not in st.session_state:
     st.session_state["brief_content"] = ""
 
 st.title("Legal Utility: Case Intelligence Brief Generator")
-st.markdown("*Strategic case framing for pre-litigation intake and active litigation workup*")
+st.markdown("*Strategic case framing for Texas personal injury litigation*")
 st.markdown("---")
 
 # API Keys from Secrets/Env
@@ -69,18 +68,18 @@ def generate_brief_docx(text, title):
 # 3. PROMPT BUILDER
 # ──────────────────────────────────────────────
 def build_prompt(stage, ctype, dlevel, doi, sol, summary, gov, cv_jurisdiction):
-    gov_txt = "\n- GOV FLAG: Apply TTCA analysis and notice deadlines." if gov else ""
+    gov_txt = "\n- GOV FLAG: Apply TTCA analysis (Texas Tort Claims Act) and formal notice deadlines." if gov else ""
     
     cv_analysis = ""
     if ctype in ["Trucking", "Commercial Vehicle"]:
         jurisdiction = f"Jurisdiction: {cv_jurisdiction}"
-        cv_analysis = f"\n- {ctype.upper()} FLAG: Apply {jurisdiction} analysis. Focus on driver qualification, maintenance logs, and preservation under relevant FMCSR/TX-DOT standards."
+        cv_analysis = f"\n- {ctype.upper()} FLAG: Apply {jurisdiction} analysis. Focus on driver qualification files (DQF), maintenance logs, telematics, and preservation under relevant FMCSR or TX-DOT standards."
     
     params = f"Framework: {ctype}\nDOI: {doi}\nSOL: {sol}\nGov Entity: {gov}\n\nSummary:\n{summary}"
     
     if stage == "Pre-Litigation":
-        return f"Draft Texas Pre-Suit Brief. {params} {gov_txt}{cv_analysis} Headers: ## 1. Chronology, ## 2. Liability, ## 3. Risk Flags, ## 4. Proof Gaps, ## 5. Defense Anticipation, ## 6. Action Items."
-    return f"Draft Texas Litigation Blueprint. {params} Discovery: {dlevel} {gov_txt}{cv_analysis} Headers: ## 1. Chronology, ## 2. Liability, ## 3. Proof Gaps, ## 4. Defense Anticipation, ## 5. Discovery Blueprint, ## 6. Strategic Flags."
+        return f"Draft a Texas Pre-Suit Brief. {params} {gov_txt}{cv_analysis} Use Headers: ## 1. Chronology, ## 2. Liability, ## 3. Risk Flags, ## 4. Proof Gaps, ## 5. Defense Anticipation, ## 6. Action Items."
+    return f"Draft a Texas Litigation Blueprint. {params} Discovery: {dlevel} {gov_txt}{cv_analysis} Use Headers: ## 1. Chronology, ## 2. Liability, ## 3. Proof Gaps, ## 4. Defense Anticipation, ## 5. Discovery Blueprint, ## 6. Strategic Flags."
 
 # ──────────────────────────────────────────────
 # 4. MAIN LAYOUT
@@ -92,13 +91,13 @@ with col1:
     case_stage = st.radio("Case Stage:", ["Pre-Litigation", "Active Litigation"], horizontal=True)
     ai_engine = st.radio("Model Engine:", ["Gemini (Google)", "ChatGPT (OpenAI)", "Claude (Anthropic)"], horizontal=True)
 
-    # API Key Selection
+    # Persistent API Key Logic
     if ai_engine == "Gemini (Google)":
-        active_key = st.text_input("Gemini API Key", value=env_gemini_key or "", type="password", key="gem_p")
+        active_key = st.text_input("Gemini API Key", value=env_gemini_key or "", type="password", key="gem_key_p")
     elif ai_engine == "ChatGPT (OpenAI)":
-        active_key = st.text_input("OpenAI API Key", value=env_openai_key or "", type="password", key="gpt_p")
+        active_key = st.text_input("OpenAI API Key", value=env_openai_key or "", type="password", key="gpt_key_p")
     else:
-        active_key = st.text_input("Anthropic API Key", value=env_anthropic_key or "", type="password", key="claude_p")
+        active_key = st.text_input("Anthropic API Key", value=env_anthropic_key or "", type="password", key="claude_key_p")
 
     st.markdown("---")
     
@@ -107,7 +106,7 @@ with col1:
         ["Standard MVA", "Commercial Vehicle", "Trucking", "Premises", "Workplace", "UM/UIM", "TTCA"]
     )
     
-    # Restored Jurisdiction Toggle
+    # Restored Jurisdiction Toggle for Commercial/Trucking
     cv_jurisdiction = "N/A"
     if case_type in ["Trucking", "Commercial Vehicle"]:
         cv_jurisdiction = st.radio(
@@ -115,7 +114,7 @@ with col1:
             ["Interstate (Federal)", "Intrastate (Texas)", "Unsure"], 
             index=2, 
             horizontal=True,
-            key="cv_scope"
+            key="cv_scope_toggle"
         )
 
     discovery_level = "Level 2"
@@ -125,7 +124,7 @@ with col1:
     st.markdown("**Risk Flags**")
     government_entity = st.checkbox("Government Entity Involved")
 
-    case_summary = st.text_area("Case Summary", height=160, placeholder="Identify parties and incident mechanics...")
+    case_summary = st.text_area("Case Summary", height=160, placeholder="Identify parties, incident mechanics, and injury status...")
     
     with st.expander("Dates"):
         doi_input = st.text_input("Incident Date", placeholder="YYYY-MM-DD")
@@ -141,7 +140,7 @@ with col2:
 
     if run_brief:
         if not case_summary.strip():
-            st.warning("Veto: Provide a case summary.")
+            st.warning("Veto: Provide a case summary to filter for causation gaps.")
         elif not active_key:
             st.error("Integrity Error: Missing API Key.")
         else:
@@ -160,8 +159,8 @@ with col2:
                 if ai_engine == "Gemini (Google)":
                     with st.spinner("Gemini analyzing..."):
                         genai.configure(api_key=active_key)
-                        # Changed from 'gemini-1.5-flash' to 'gemini-1.5-flash-latest'
-                        model = genai.GenerativeModel("gemini-1.5-flash-latest")
+                        # Fix for 404: Using the specific production model string
+                        model = genai.GenerativeModel("gemini-1.5-flash")
                         st.session_state["brief_content"] = model.generate_content(prompt).text
                 elif ai_engine == "ChatGPT (OpenAI)":
                     with st.spinner("OpenAI analyzing..."):
@@ -183,7 +182,7 @@ with col2:
             except Exception as e:
                 st.error(f"Execution Error: {e}")
 
-    # Render brief and download button if content exists
+    # Persistent Editor & Download
     if st.session_state["brief_content"]:
         edited_text = st.text_area(
             "Strategic Brief Editor:", 
