@@ -106,35 +106,67 @@ with col2:
     st.subheader("2. Case Intelligence Brief")
 
     if run_brief:
+        # Data Integrity Check: The Sieve must have content to work
         if not case_summary.strip():
-            st.warning("Veto: Provide a case summary.")
+            st.warning("Veto: Provide a case summary to filter for causation gaps.")
         elif not active_key:
-            st.error("Missing API Key.")
+            st.error("Integrity Error: Missing API Key for selected engine.")
         else:
-            prompt = build_prompt(case_stage, case_type, discovery_level, date_of_incident, sol_date, case_summary, government_entity, include_comm)
+            # Passing all parameters including the restored FMCSR Jurisdiction
+            prompt = build_prompt(
+                case_stage, 
+                case_type, 
+                discovery_level, 
+                doi_input, 
+                sol_input, 
+                case_summary, 
+                government_entity,
+                cv_jurisdiction
+            )
             
             try:
                 if ai_engine == "Gemini (Google)":
-                    with st.spinner("Gemini thinking..."):
+                    with st.spinner("Gemini analyzing case logic..."):
                         genai.configure(api_key=active_key)
                         model = genai.GenerativeModel("gemini-1.5-flash")
                         st.session_state["brief_content"] = model.generate_content(prompt).text
                 elif ai_engine == "ChatGPT (OpenAI)":
-                    with st.spinner("OpenAI thinking..."):
+                    with st.spinner("OpenAI analyzing case logic..."):
                         client = OpenAI(api_key=active_key)
-                        resp = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
+                        resp = client.chat.completions.create(
+                            model="gpt-4o", 
+                            messages=[{"role": "user", "content": prompt}]
+                        )
                         st.session_state["brief_content"] = resp.choices[0].message.content
                 elif ai_engine == "Claude (Anthropic)":
-                    with st.spinner("Claude thinking..."):
+                    with st.spinner("Claude analyzing case logic..."):
                         client = anthropic.Anthropic(api_key=active_key)
-                        resp = client.messages.create(model="claude-3-5-sonnet-20240620", max_tokens=4000, messages=[{"role": "user", "content": prompt}])
+                        resp = client.messages.create(
+                            model="claude-3-5-sonnet-20240620", 
+                            max_tokens=4000, 
+                            messages=[{"role": "user", "content": prompt}]
+                        )
                         st.session_state["brief_content"] = resp.content[0].text
             except Exception as e:
-                st.error(f"Error: {e}")
+                st.error(f"Execution Error: {e}")
 
+    # Display the result in a persistent editor
     if st.session_state["brief_content"]:
-        edited = st.text_area("Edit Brief:", value=st.session_state["brief_content"], height=500)
-        st.session_state["brief_content"] = edited
+        # Standardize formatting to Times New Roman style in the UI
+        edited_text = st.text_area(
+            "Strategic Brief Editor:", 
+            value=st.session_state["brief_content"], 
+            height=600
+        )
+        st.session_state["brief_content"] = edited_text
         
+        # Mechanical Necessity: Generate the Word Doc for final output
         docx_data = generate_brief_docx(st.session_state["brief_content"], "CASE INTELLIGENCE BRIEF")
-        st.download_button("📥 Download (.docx)", data=docx_data, file_name="Case_Brief.docx", use_container_width=True)
+        
+        st.download_button(
+            label="📥 Download Strategic Case Brief (.docx)",
+            data=docx_data,
+            file_name="Case_Intelligence_Brief.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            use_container_width=True
+        )
