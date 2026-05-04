@@ -15,7 +15,6 @@ st.title("Legal Utility: Case Review & Workflow Auditor")
 st.markdown("---")
 
 # --- SECURE API KEY RESOLUTION ---
-# Looks for default keys stored in system settings or environment variables
 env_gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
 env_openai_key = st.secrets.get("OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY")
 env_anthropic_key = st.secrets.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
@@ -82,7 +81,6 @@ with tab1:
         
         active_api_key = ""
         
-        # Dynamic API key entry logic
         if ai_engine == "Gemini (Google)":
             if env_gemini_key:
                 active_api_key = st.text_input(
@@ -233,3 +231,30 @@ with tab1:
                 if output_text:
                     st.success("Case Audit Generated Successfully")
                     st.session_state["last_audit_output"] = output_text
+
+        # 4. Display Persistent Downloads
+        if "last_audit_output" in st.session_state:
+            output_text = st.session_state["last_audit_output"]
+            
+            st.markdown("### Export Report to Word")
+            docx_data = generate_audit_docx(output_text)
+            st.download_button(
+                label="📥 Download Audit Report (.docx)",
+                data=docx_data,
+                file_name="Case_Workflow_Veto_Report.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                use_container_width=True
+            )
+            
+            st.markdown("---")
+            st.markdown(output_text)
+
+with tab2:
+    st.markdown("""
+    ### The Veto Philosophy
+    Building elite case-management processes means setting up mechanical safeguards that catch issues before they turn into major liabilities.
+    
+    * **Statute of Limitations:** Tracks critical countdown metrics to stop procedural defaults.
+    * **Causation Integrity:** Catches treatment gaps and pre-existing injury issues before defense discovery can exploit them.
+    * **Lien/Coverage Squeezes:** Compares total medical costs against available policy coverage early, avoiding unprofitable settlements down the line.
+    """)
