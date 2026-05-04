@@ -54,14 +54,13 @@ def generate_brief_docx(text, title):
 # ──────────────────────────────────────────────
 def build_prompt(stage, ctype, dlevel, doi, sol, summary, gov, cv_jurisdiction):
     gov_flag = (
-        "\n   - GOVERNMENT ENTITY FLAG: Apply TTCA / sovereign immunity analysis. "
-        "Identify specific agency rules and notice deadlines (e.g., 6-month notice)."
+        "\n- GOVERNMENT ENTITY FLAG: Apply TTCA analysis. Identify notice deadlines (6-month/city charter) and FOIA targets." 
         if gov else ""
     )
 
     cv_flag = (
-        f"\n   - COMMERCIAL VEHICLE FLAG: Apply FMCSR / {cv_jurisdiction} analysis. "
-        "Flag DQF, Hours of Service, and black box preservation obligations."
+        f"\n- COMMERCIAL VEHICLE FLAG: Apply FMCSR / {cv_jurisdiction} analysis. "
+        "Demand depth on HOS (Part 395), DQF (Part 391), and EDR/Black Box data."
         if "Commercial" in ctype or "Trucking" in ctype else ""
     )
 
@@ -77,53 +76,31 @@ CASE SUMMARY:
 \"\"\"{summary}\"\"\"
 """
 
-    if stage == "Pre-Litigation":
-        return f"""
-You are a Texas personal injury litigation strategist conducting a pre-suit intake review. 
-Your output is a Case Intelligence Brief—a structured strategic framework for early case workup.
-Do NOT draft discovery requests. This matter has not been filed.
+    return f"""
+You are a Senior Texas Litigation Strategist. Your task is to produce a high-utility, 
+granular Case Intelligence Brief that acts as a "Sieve" to catch liability gaps.
 
 {shared_params}
 {gov_flag}{cv_flag}
+- Discovery Level: {dlevel if stage == "Active Litigation" else "N/A"}
 
-DIRECTIVES:
-1. Identify specific agency notice deadlines (TTCA vs. Home-Rule).
-2. List FOIA / Texas Public Information Act targets and record categories.
-3. Identify spoliation risks and what preservation demand letters should issue immediately.
-4. Be precise on dates. If the SOL date is provided, flag approaching windows.
-5. Use these exact headers:
+### DIRECTIVES FOR ANALYSIS DEPTH:
+1. **Liability Theory**: Don't just list negligence. Break down "Negligence Per Se" via Texas Transportation Code and "Direct vs. Vicarious" liability for companies.
+2. **Proof Gap Analysis**: Create a "Missing Evidence" checklist. Identify WHO holds the data and the PRIORITY of acquisition (e.g., EDR data must be acquired first).
+3. **Defense Anticipation**: Act as the "Defense Devil's Advocate." Predict specific affirmative defenses (Sudden Emergency, Comparative Fault) and provide the discovery "counter-move" to pin them down.
+4. **Discovery Blueprint**: 
+   - Requests for Admission: Focus on locking down causation, scope of employment, and FMCSR compliance.
+   - Requests for Production: Identify specific data types—ELD raw files, Dispatch communication logs, and Driver Qualification Files (DQF).
+   - Interrogatories: Identify specific targets for "Human Factors" (sleep schedules, device usage).
+5. **Strategic Flags**: Detail "Spoliation Risks" with specific data-overwriting timelines (e.g., EDR loops). Identify specialized expert needs (Accident Reconstruction vs. Trucking Standard of Care).
+
+### REQUIRED STRUCTURE:
 ## 1. Chronology & Case Metrics
 ## 2. Liability Theory & Exposure Analysis
-## 3. Intake Risk Flags
-## 4. Proof Gap Analysis
-## 5. Defense Anticipation
-## 6. Pre-Suit Action Items
-"""
-
-    else:  # Active Litigation
-        return f"""
-You are a Texas personal injury litigation strategist conducting a case workup review for
-an active suit. Your output is a Case Intelligence Brief — a Discovery Blueprint and
-strategic framework. Do NOT draft actual discovery requests. 
-
-{shared_params}
-- Discovery Level: {dlevel}
-{gov_flag}{cv_flag}
-
-DIRECTIVES:
-1. Do not include items covered by TRCP Rule 194.2 Required Disclosures.
-2. Organize the Discovery Blueprint by target and strategic purpose.
-3. Identify expert witness needs, spoliation risks, and insurance/coverage issues.
-4. Use these exact headers:
-## 1. Chronology & Case Metrics
-## 2. Liability Theory & Exposure Analysis
-## 3. Proof Gap Analysis
-## 4. Defense Anticipation & Contention Points
-## 5. Discovery Blueprint
-  ### Requests for Admission
-  ### Requests for Production
-  ### Interrogatories
-## 6. Strategic Flags
+## 3. Proof Gap Analysis (Evidence Checklist)
+## 4. Defense Anticipation & Discovery Counter-Moves
+## 5. Discovery Blueprint (### RFA, ### RFP, ### Interrogatories)
+## 6. Strategic Flags (Spoliation, Experts, Insurance)
 """
 
 # 4. MAIN LAYOUT
