@@ -77,9 +77,9 @@ def generate_brief_docx(brief_text: str, doc_title: str) -> io.BytesIO:
 # ──────────────────────────────────────────────
 # 4. PROMPT BUILDER
 # ──────────────────────────────────────────────
-def build_prompt(case_stage, case_type, discovery_level, date_of_incident, sol_date, case_summary, government_entity, include_fmcsr):
+def build_prompt(case_stage, case_type, discovery_level, date_of_incident, sol_date, case_summary, government_entity, include_commercial_analysis):
     gov_flag = "\n- GOVERNMENT ENTITY FLAG: Apply TTCA analysis. Identify notice deadlines." if government_entity else ""
-    cv_flag = "\n- FMCSR/TRUCKING FLAG: Conduct in-depth research of specific FMCSRs. Flag preservation needs." if include_fmcsr else ""
+    cv_flag = "\n- COMMERCIAL VEHICLE/FMCSR FLAG: Conduct in-depth research of commercial regulations (FMCSR where applicable). Identify company safety manuals, driver qualification files, and preservation needs." if include_commercial_analysis else ""
 
     shared_params = f"""
 CASE PARAMETERS:
@@ -87,7 +87,7 @@ CASE PARAMETERS:
 - Incident Date: {date_of_incident if date_of_incident else "Not provided"}
 - SOL Date: {sol_date if sol_date else "Not provided"}
 - Government Entity: {"YES" if government_entity else "No"}
-- FMCSR Analysis: {"YES" if include_fmcsr else "No"}
+- Commercial Vehicle/FMCSR Analysis: {"YES" if include_commercial_analysis else "No"}
 
 SUMMARY:
 {case_summary}
@@ -128,8 +128,14 @@ with col1:
 
     st.markdown("**Risk Flags**")
     government_entity = st.checkbox("Government Entity Involved")
-    commercial_status = st.radio("FMCSR Apply?", ["Confirmed Yes", "Confirmed No", "Unsure"], index=2, horizontal=True)
-    include_fmcsr_analysis = (commercial_status in ["Confirmed Yes", "Unsure"])
+    
+    # Universal Commercial Vehicle Check
+    commercial_status = st.radio(
+        "Commercial Vehicle Involved?", 
+        ["No", "Confirmed Yes", "Unsure / Needs Analysis"], 
+        index=0, horizontal=True
+    )
+    include_commercial_analysis = (commercial_status in ["Confirmed Yes", "Unsure / Needs Analysis"])
 
     case_summary = st.text_area("Case Summary", height=160, placeholder="Enter key facts...")
 
@@ -155,7 +161,7 @@ with col2:
             prompt = build_prompt(
                 case_stage, case_type, discovery_level, 
                 date_of_incident, sol_date, case_summary, 
-                government_entity, include_fmcsr_analysis
+                government_entity, include_commercial_analysis
             )
             
             output_text = ""
