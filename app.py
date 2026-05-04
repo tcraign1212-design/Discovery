@@ -336,7 +336,7 @@ else:
 with col2:
     st.subheader("2. Case Intelligence Brief")
 
-    if run_brief:
+if run_brief:
         if not case_summary.strip():
             st.warning("Please provide a case summary before generating.")
         elif not active_api_key:
