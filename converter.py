@@ -18,83 +18,38 @@ st.markdown("---")
 # 2. Canonical Texas 42-Point Objection Taxonomy
 TAXONOMY_OBJECTIONS = {
     # 1. Core Scope and Form Objections
-    "OB-TX-001: Relevance / Outside Scope": (
-        "Plaintiff objects to this request under TRCP 193.2 to the extent it seeks information "
-        "not relevant to any party's claim or defense and is not within the permissible scope of discovery."
-    ),
-    "OB-TX-002: Overbroad as to Time": (
-        "Plaintiff objects that this request is overly broad because it is not reasonably limited in time "
-        "to the matters at issue in this litigation."
-    ),
-    "OB-TX-003: Overbroad as to Subject Matter": (
-        "Plaintiff objects that this request is overly broad because it is not reasonably tailored to include "
-        "only matters relevant to the issues in dispute."
-    ),
-    "OB-TX-004: Vague / Ambiguous / Undefined Terms": (
-        "Plaintiff objects that this request is vague and ambiguous because it fails to define the key terms "
-        "with reasonable certainty, such that Plaintiff cannot determine the exact information sought."
-    ),
-    "OB-TX-005: Lack of Reasonable Particularity": (
-        "Plaintiff objects that this request fails to describe the items or documents sought with reasonable "
-        "particularity and therefore imposes an improper burden on the responding party."
-    ),
-    "OB-TX-006: Improper Fishing Expedition": (
-        "Plaintiff objects that this request constitutes an improper fishing expedition and is not reasonably "
-        "tailored to obtain information directly relevant to the claims or defenses at issue."
-    ),
+    "OB-TX-001: Relevance / Outside Scope": "Plaintiff objects to this request under TRCP 193.2 to the extent it seeks information not relevant to any party's claim or defense and is not within the permissible scope of discovery.",
+    "OB-TX-002: Overbroad as to Time": "Plaintiff objects that this request is overly broad because it is not reasonably limited in time to the matters at issue in this litigation.",
+    "OB-TX-003: Overbroad as to Subject Matter": "Plaintiff objects that this request is overly broad because it is not reasonably tailored to include only matters relevant to the issues in dispute.",
+    "OB-TX-004: Vague / Ambiguous / Undefined Terms": "Plaintiff objects that this request is vague and ambiguous because it fails to define the key terms with reasonable certainty, such that Plaintiff cannot determine the exact information sought.",
+    "OB-TX-005: Lack of Reasonable Particularity": "Plaintiff objects that this request fails to describe the items or documents sought with reasonable particularity and therefore imposes an improper burden on the responding party.",
+    "OB-TX-006: Improper Fishing Expedition": "Plaintiff objects that this request constitutes an improper fishing expedition and is not reasonably tailored to obtain information directly relevant to the claims or defenses at issue.",
     
     # 2. Burden, Proportionality, and Procedural Objections
-    "OB-TX-007: Undue Burden / Expense": (
-        "Plaintiff objects that complying with this request would impose an undue burden and expense "
-        "that is completely disproportionate to the likely benefit of the discovery."
-    ),
-    "OB-TX-008: More Convenient / Less Burdensome Source": (
-        "Plaintiff objects to this request to the extent the information or responsive documents sought are "
-        "obtainable from a source that is more convenient, less burdensome, or less expensive."
-    ),
-    "OB-TX-009: Duplicative / Previously Produced": (
-        "Plaintiff objects that this request is unreasonably cumulative or duplicative and, to the extent responsive "
-        "material exists, it has already been produced or identified in prior productions."
-    ),
-    "OB-TX-010: Premature / Discovery Ongoing": (
-        "Plaintiff objects that this request is premature to the extent it seeks a complete factual or evidentiary "
-        "statement before discovery is sufficiently developed."
-    ),
-    "OB-TX-011: Mandatory Initial Disclosures (TRCP 194)": (
-        "Plaintiff objects that this request seeks information through an improper discovery vehicle as the "
-        "subject matter is directly governed by required initial disclosures under TRCP 194.1."
-    ),
+    "OB-TX-007: Undue Burden / Expense": "Plaintiff objects that complying with this request would impose an undue burden and expense that is completely disproportionate to the likely benefit of the discovery.",
+    "OB-TX-008: More Convenient / Less Burdensome Source": "Plaintiff objects to this request to the extent the information or responsive documents sought are obtainable from a source that is more convenient, less burdensome, or less expensive.",
+    "OB-TX-009: Duplicative / Previously Produced": "Plaintiff objects that this request is unreasonably cumulative or duplicative and, to the extent responsive material exists, it has already been produced or identified in prior productions.",
+    "OB-TX-010: Premature / Discovery Ongoing": "Plaintiff objects that this request is premature to the extent it seeks a complete factual or evidentiary statement before discovery is sufficiently developed.",
+    "OB-TX-011: Mandatory Initial Disclosures (TRCP 194)": "Plaintiff objects that this request seeks information through an improper discovery vehicle as the subject matter is directly governed by required initial disclosures under TRCP 194.1.",
     
     # 3. Privilege and Protected-Information Objections
-    "OB-TX-012: TRCP 193.3 Withholding Statement": (
-        "Responsive material has been withheld pursuant to Tex. R. Civ. P. 193.3. The withheld material is responsive "
-        "to this request and is withheld on the basis of applicable privileges."
-    ),
-    "OB-TX-013: Attorney-Client Privilege": (
-        "Plaintiff withholds responsive material protected by the attorney-client privilege and provides this "
-        "withholding statement pursuant to Rule 193.3."
-    ),
-    "OB-TX-014: Work Product Privilege": (
-        "Plaintiff objects and withholds responsive material to the extent it constitutes work product or material "
-        "prepared in anticipation of litigation under TRCP 192.5."
-    ),
-    "OB-TX-015: Consulting Expert Protection": (
-        "Plaintiff objects to this request to the extent it seeks the identity, mental impressions, or opinions of "
-        "consulting experts not expected to testify."
-    ),
-    "OB-TX-016: Spousal Privilege": (
-        "Plaintiff objects to the extent this request seeks confidential communications between spouses protected "
-        "by the spousal communications privilege."
-    ),
-    "OB-TX-017: Mental Health Records Not at Issue": (
-        "Plaintiff objects to this request to the extent it seeks highly sensitive mental-health information where "
-        "Plaintiff has not affirmatively placed their mental condition at issue in this litigation."
-    ),
-    "OB-TX-018: Privacy / Sensitive Personal Info": (
-        "Plaintiff objects to this request to the extent it seeks highly sensitive personal identifiers or private "
-        "information without a demonstrated need that is proportional to the case."
-    ),
+    "OB-TX-012: TRCP 193.3 Withholding Statement": "Responsive material has been withheld pursuant to Tex. R. Civ. P. 193.3. The withheld material is responsive to this request and is withheld on the basis of applicable privileges.",
+    "OB-TX-013: Attorney-Client Privilege": "Plaintiff withholds responsive material protected by the attorney-client privilege and provides this withholding statement pursuant to Rule 193.3.",
+    "OB-TX-014: Work Product Privilege": "Plaintiff objects and withholds responsive material to the extent it constitutes work product or material prepared in anticipation of litigation under TRCP 192.5.",
+    "OB-TX-015: Consulting Expert Protection": "Plaintiff objects to this request to the extent it seeks the identity, mental impressions, or opinions of consulting experts not expected to testify.",
+    "OB-TX-016: Spousal Privilege": "Plaintiff objects to the extent this request seeks confidential communications between spouses protected by the spousal communications privilege.",
+    "OB-TX-017: Mental Health Records Not at Issue": "Plaintiff objects to this request to the extent it seeks highly sensitive mental-health information where Plaintiff has not affirmatively placed their mental condition at issue in this litigation.",
+    "OB-TX-018: Privacy / Sensitive Personal Info": "Plaintiff objects to this request to the extent it seeks highly sensitive personal identifiers or private information without a demonstrated need that is proportional to the case.",
     
     # 4. Interrogatory-Specific Objections
-    "OB-TX-019: Narrative / Marshaling Proof": (
-        "Plaintiff objects to this interrogatory
+    "OB-TX-019: Narrative / Marshaling Proof": "Plaintiff objects to this interrogatory to the extent it requires a narrative response or detailed marshaling of proof more appropriately developed through deposition.",
+    "OB-TX-020: Marshal All Evidence": "Plaintiff objects that this interrogatory improperly seeks to force Plaintiff to marshal all evidence supporting its claims or defenses.",
+    "OB-TX-021: Medical Opinion from Lay Party": "Plaintiff objects to the extent this interrogatory requires a lay party Plaintiff to provide medical opinions beyond Plaintiff's personal knowledge or expert qualifications.",
+    "OB-TX-022: Improper Expert Discovery by Interrogatory": "Plaintiff objects to this interrogatory to the extent it seeks expert information outside the scope or manner authorized by the expert discovery rules.",
+    "OB-TX-023: Beyond Current Knowledge": "Plaintiff objects to the extent this interrogatory seeks information beyond Plaintiff's present knowledge and attempts to bind Plaintiff to a complete evidentiary statement before discovery is complete.",
+    "OB-TX-024: Exceeds Numerical Discovery Plan Limits": "Plaintiff objects because this set exceeds the maximum number of permissible requests or answers under the governing TRCP discovery control plan.",
+    
+    # 5. RFP / Authorization / Records Objections
+    "OB-TX-025: Not in Possession, Custody, or Control": "Plaintiff objects to the extent this request seeks materials not within Plaintiff's possession, custody, or control.",
+    "OB-TX-026: Request Requires Creation of a Document": "Plaintiff objects because this request improperly requires Plaintiff to create a document that does not presently exist.",
+    "OB-TX-027: Blank Authorization / Lack of Specificity": "Plaintiff objects to signing the requested authorization in blank because it fails to specify the records sought or specific providers, depriving Plaintiff of a meaningful opportunity to evaluate relevance.",
