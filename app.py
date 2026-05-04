@@ -126,14 +126,20 @@ RISK FLAGS:{gov_flag}{cv_flag}
 # ──────────────────────────────────────────────
 col1, col2 = st.columns([2, 3])
 
+# Initialize Safety Defaults (The "Veto" for NameErrors)
+discovery_level = "N/A"
+include_fmcsr_analysis = True 
+
 with col1:
     st.subheader("1. Case Details")
 
     case_stage = st.radio("Case Stage:", ["Pre-Litigation", "Active Litigation"], horizontal=True)
+
     st.markdown("---")
 
     ai_engine = st.radio("Select Model Engine:", ["Gemini (Google)", "ChatGPT (OpenAI)", "Claude (Anthropic)"], horizontal=True)
     
+    # API Key Logic
     active_api_key = ""
     if ai_engine == "Gemini (Google)":
         active_api_key = st.text_input("Gemini API Key", value=env_gemini_key or "", type="password")
@@ -146,21 +152,22 @@ with col1:
 
     case_type = st.selectbox("Case Type / Framework:", ["Standard MVA", "Commercial Trucking", "Premises Liability", "Workplace Injury", "UM/UIM", "TTCA"])
 
+    # Discovery Level Flow
     if case_stage == "Active Litigation":
         discovery_level = st.radio("Discovery Level:", ["Level 1", "Level 2", "Level 3"], index=1, horizontal=True)
-    else:
-        discovery_level = "N/A"
 
     st.markdown("**Risk Flags**")
     government_entity = st.checkbox("Government Entity Involved")
     
+    # Your New Trucking Logic
     commercial_status = st.radio(
         "Does FMCSR / Commercial Regs apply?",
         ["Confirmed Yes", "Confirmed No", "Unsure / Needs Analysis"],
         index=2, horizontal=True
     )
 
-    include_fmcsr_analysis = commercial_status in ["Confirmed Yes", "Unsure / Needs Analysis"]
+    # This defines the variable for the Prompt Builder
+    include_fmcsr_analysis = (commercial_status in ["Confirmed Yes", "Unsure / Needs Analysis"])
 
     case_summary = st.text_area("Case Summary / Fact Pattern", height=160)
 
@@ -171,6 +178,7 @@ with col1:
         with c2:
             sol_date = st.text_input("SOL Expiration Date", placeholder="YYYY-MM-DD")
 
+    # The Button - Flushed with the rest of Col1
     run_brief = st.button("Generate Case Intelligence Brief", type="primary", use_container_width=True)
 
 # ──────────────────────────────────────────────
