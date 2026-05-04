@@ -291,11 +291,6 @@ with col1:
     government_entity = st.checkbox("Government Entity Involved (TTCA / Sovereign Immunity)")
     
     commercial_vehicle = st.checkbox("Commercial Vehicle Involved")
-    
-    # This is the "Nested Sieve"
-    interstate_applies = False
-    if commercial_vehicle:
-        # These only appear if the box above is checked
 
     st.markdown("**Commercial Vehicle Status**")
     commercial_status = st.radio(
