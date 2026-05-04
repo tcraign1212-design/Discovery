@@ -202,35 +202,110 @@ TAXONOMY_OBJECTIONS = {
 
 # --- IMPROVED DOCUMENT GENERATION ENGINE ---
 
+# --- DOCUMENT GENERATION FUNCTIONS ---
+
 def convert_pdf_text_to_docx(pdf_file):
-    reader = PdfReader(pdf_file)
+    # (Keep this function exactly as it is)
+    ...
+
+
+# =====================================================================
+# DELETE THE OLD generate_response_docx FUNCTION COMPLETELY
+# AND PASTE THE NEW OVERHAULED PATTERN-RECOGNITION FUNCTION BELOW
+# =====================================================================
+
+import re
+
+def generate_response_docx(content_text):
+    """
+    Overhauled pattern-recognition engine. Automatically bolds all discovery 
+    requests, interrogatories, and answers without relying on markdown characters.
+    """
     doc = docx.Document()
+    
+    # 1. 1-inch Court-Standard Margins
     for section in doc.sections:
         section.top_margin = Inches(1)
         section.bottom_margin = Inches(1)
         section.left_margin = Inches(1)
         section.right_margin = Inches(1)
 
+    # 2. Set Default Style: Times New Roman 12pt
     style_normal = doc.styles['Normal']
     font = style_normal.font
     font.name = 'Times New Roman'
     font.size = Pt(12)
 
-    for i, page in enumerate(reader.pages):
-        page_text = page.extract_text()
-        if page_text:
-            lines = page_text.split('\n')
-            for line in lines:
-                cleaned_line = line.strip()
-                if cleaned_line:
-                    doc.add_paragraph(cleaned_line)
-        else:
-            doc.add_paragraph(f"[Page {i+1} contained no directly extractable text]")
+    # 3. Court Caption Title
+    p_title = doc.add_paragraph()
+    p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_title.paragraph_format.space_after = Pt(6)
+    run_title = p_title.add_run("PLAINTIFF’S RESPONSES AND OBJECTIONS TO DEFENDANT’S DISCOVERY")
+    run_title.font.bold = True
+    run_title.font.size = Pt(12)
+    
+    # Structural separator line
+    p_sep = doc.add_paragraph()
+    p_sep.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_sep.paragraph_format.space_after = Pt(18)
+    p_sep.add_run("______________________________________________________________________")
+
+    # 4. Content Parsing via Direct Regex & Pattern Matching
+    lines = content_text.split('\n')
+    for line in lines:
+        cleaned_line = line.strip()
+        if not cleaned_line:
+            continue
             
+        p = doc.add_paragraph()
+        p.paragraph_format.space_after = Pt(12)
+        p.paragraph_format.line_spacing = 1.15
+        
+        # Strip out legacy markdown heading markers (#) just in case
+        if cleaned_line.startswith('#'):
+            cleaned_line = cleaned_line.replace('#', '').strip()
+
+        # Regex to catch: "INTERROGATORY NO. X", "REQUEST NO. X", or "REQUEST FOR PRODUCTION NO. X"
+        discovery_header_match = re.match(
+            r'^(INTERROGATORY|REQUEST FOR PRODUCTION|REQUEST)\s+(FOR\s+PRODUCTION\s+)?NO\s*\.\s*\d+.*', 
+            cleaned_line, 
+            re.IGNORECASE
+        )
+
+        # Regex to catch: "ANSWER:", "RESPONSE:"
+        answer_header_match = re.match(r'^(ANSWER|RESPONSE)\s*:.*', cleaned_line, re.IGNORECASE)
+
+        # Apply specific formatting based on the identified pattern
+        if discovery_header_match:
+            run = p.add_run(cleaned_line)
+            run.font.bold = True
+            p.paragraph_format.space_before = Pt(12)
+            
+        elif answer_header_match:
+            run = p.add_run(cleaned_line)
+            run.font.bold = True
+            p.paragraph_format.left_indent = Inches(0.5)
+            
+        elif "**" in cleaned_line:
+            # Catch and strip out any remaining explicit bolding syntax
+            parts = cleaned_line.split('**')
+            for index, part in enumerate(parts):
+                if index % 2 == 1:
+                    run = p.add_run(part)
+                    run.font.bold = True
+                else:
+                    run = p.add_run(part)
+        else:
+            # Fallback for standard paragraph text
+            p.add_run(cleaned_line)
+
     buffer = io.BytesIO()
     doc.save(buffer)
     buffer.seek(0)
     return buffer
+    
+tab1, tab2 = st.tabs(["📄 Convert PDF to Word", "⚖️ Discovery Response Drafter"])
+...
 
 
 def generate_response_docx(content_text):
