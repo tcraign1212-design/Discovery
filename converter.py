@@ -5,7 +5,6 @@ import re
 import docx
 from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.shared import RGBColor
 from pypdf import PdfReader
 import google.generativeai as genai
 from openai import OpenAI
@@ -63,7 +62,7 @@ K40 = "OB-TX-040: Prejudicial Terms / Controverted Text"
 K41 = "OB-TX-041: All Written Complaints (Overbroad)"
 K42 = "OB-TX-042: Ex Parte Provider Communications"
 
-# Standalone Values
+# Dynamic Value Assignments
 V1 = "Plaintiff objects to this request under TRCP 193.2 to the extent it seeks information not relevant to any party's claim or defense and is not within the permissible scope of discovery."
 V2 = "Plaintiff objects that this request is overly broad because it is not reasonably limited in time to the matters at issue in this litigation."
 V3 = "Plaintiff objects that this request is overly broad because it is not reasonably tailored to include only matters relevant to the issues in dispute."
@@ -107,7 +106,7 @@ V40 = "Plaintiff objects to the use of highly subjective or prejudicial terms wi
 V41 = "Plaintiff objects because the request for all written complaints across unrelated matters is overly broad, vague, and constitutes a prohibited fishing expedition."
 V42 = "Plaintiff objects to the extent the requested authorization would permit ex parte communications with healthcare providers rather than the production of defined records."
 
-# Map cleanly using variables
+# Map keys to strings
 TAXONOMY_OBJECTIONS[K1] = V1
 TAXONOMY_OBJECTIONS[K2] = V2
 TAXONOMY_OBJECTIONS[K3] = V3
@@ -199,12 +198,10 @@ def generate_response_docx(content_text, include_styling_box=False, style_detail
     font.name = 'Times New Roman'
     font.size = Pt(12)
 
-    # Insert Case Style Table if enabled
     if include_styling_box and style_details:
         table = doc.add_table(rows=1, cols=2)
         table.autofit = False
         
-        # Explicit widths to constrain the 2-column look
         col_widths = [Inches(3.25), Inches(3.25)]
         for i, col in enumerate(table.columns):
             col.width = col_widths[i]
@@ -223,7 +220,6 @@ def generate_response_docx(content_text, include_styling_box=False, style_detail
         p_right.paragraph_format.line_spacing = 1.15
         p_right.add_run(f"§\tIN THE DISTRICT COURT\n§\n§\n§\t{style_details.get('court', '')}\n§\n§\t{style_details.get('county', '')} COUNTY, TEXAS")
         
-        # Separation line below the table
         p_spacer = doc.add_paragraph()
         p_spacer.paragraph_format.space_before = Pt(12)
         p_spacer.paragraph_format.space_after = Pt(12)
@@ -235,6 +231,9 @@ def generate_response_docx(content_text, include_styling_box=False, style_detail
     run_title = p_title.add_run("PLAINTIFF’S RESPONSES AND OBJECTIONS TO DEFENDANT’S DISCOVERY")
     run_title.font.bold = True
     run_title.font.size = Pt(12)
+
+    # Identifiers for structural regex matching
+    subpart_regex = re.compile(r'^(?:[a-g1-9]\.|\([a-g1-9]\))\s')
 
     lines = content_text.split('\n')
     for line in lines:
@@ -251,7 +250,6 @@ def generate_response_docx(content_text, include_styling_box=False, style_detail
 
         upper_line = cleaned_line.upper()
 
-        # Dynamic matching
         is_discovery_header = (
             "INTERROGATORY NO" in upper_line or 
             "REQUEST NO" in upper_line or 
@@ -264,6 +262,7 @@ def generate_response_docx(content_text, include_styling_box=False, style_detail
             upper_line.startswith("RESPONSE")
         )
 
+        # Dynamic formatting styles
         if is_discovery_header:
             run = p.add_run(cleaned_line)
             run.font.bold = True
@@ -275,7 +274,21 @@ def generate_response_docx(content_text, include_styling_box=False, style_detail
             run.font.bold = True
             p.paragraph_format.left_indent = Inches(0.25)
             p.paragraph_format.space_after = Pt(6)
-            
+
+        # Explicitly indent any subparts by .5"
+        elif subpart_regex.match(cleaned_line):
+            p.paragraph_format.left_indent = Inches(0.5)
+            p.paragraph_format.space_after = Pt(4)
+            if "**" in cleaned_line:
+                parts = cleaned_line.split('**')
+                for index, part in enumerate(parts):
+                    if index % 2 == 1:
+                        p.add_run(part).font.bold = True
+                    else:
+                        p.add_run(part)
+            else:
+                p.add_run(cleaned_line)
+                
         elif "**" in cleaned_line:
             parts = cleaned_line.split('**')
             for index, part in enumerate(parts):
@@ -337,7 +350,6 @@ with tab2:
         
         st.markdown("---")
         
-        # Dynamic case styling toggle
         use_case_styling = st.checkbox("Include Case Styling Box at Top?", value=True)
         
         cause_no = ""
