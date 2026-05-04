@@ -5,12 +5,18 @@ from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 import google.generativeai as genai
 from openai import OpenAI
+import os
 
 # 1. Page Configuration
 st.set_page_config(page_title="Case Review & Veto Auditor", layout="wide")
 
 st.title("Legal Utility: Case Review & Workflow Auditor")
 st.markdown("---")
+
+# --- SECURE API KEY RESOLUTION ---
+# This looks for keys securely stored in Streamlit Secrets or Environment Variables
+env_gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
+env_openai_key = st.secrets.get("OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY")
 
 # --- DOCUMENT GENERATION FUNCTIONS ---
 
@@ -65,18 +71,36 @@ with tab1:
     with col1:
         st.subheader("1. Case & Workflow Inputs")
         
-        # User API Key Setup
+        # User AI Engine Selection
         ai_engine = st.radio(
             "Select Inference Model Engine:",
             ["Gemini (Google)", "ChatGPT (OpenAI)"],
             horizontal=True
         )
         
-        user_api_key = st.text_input(
-            f"Required: Enter your personal {ai_engine} API Key",
-            type="password",
-            placeholder="Key is not logged or stored on the server"
-        )
+        # API Key Field Logic: 
+        # If the key is already stored securely in background secrets, do not ask the user for it.
+        active_api_key = ""
+        if ai_engine == "Gemini (Google)":
+            if env_gemini_key:
+                st.info("🔒 Secure Gemini API Key detected in system settings.")
+                active_api_key = env_gemini_key
+            else:
+                active_api_key = st.text_input(
+                    "Required: Enter your personal Gemini API Key",
+                    type="password",
+                    placeholder="AI key is not logged or stored on the server"
+                )
+        elif ai_engine == "ChatGPT (OpenAI)":
+            if env_openai_key:
+                st.info("🔒 Secure OpenAI API Key detected in system settings.")
+                active_api_key = env_openai_key
+            else:
+                active_api_key = st.text_input(
+                    "Required: Enter your personal OpenAI API Key",
+                    type="password",
+                    placeholder="AI key is not logged or stored on the server"
+                )
         
         st.markdown("---")
         
@@ -115,8 +139,8 @@ with tab1:
         if run_audit:
             if not case_summary:
                 st.warning("Please provide case details or a summary to analyze.")
-            elif not user_api_key:
-                st.error(f"Please provide your personal {ai_engine} API Key.")
+            elif not active_api_key:
+                st.error(f"Please provide a valid {ai_engine} API Key to run the audit.")
             else:
                 modules_to_run = "\n".join([f"- {m}" for m in screening_modules])
                 
@@ -153,7 +177,7 @@ with tab1:
                 if ai_engine == "Gemini (Google)":
                     with st.spinner("Processing through Gemini Veto Sieve..."):
                         try:
-                            genai.configure(api_key=user_api_key)
+                            genai.configure(api_key=active_api_key)
                             model = genai.GenerativeModel("gemini-2.5-flash")
                             response = model.generate_content(prompt)
                             output_text = response.text
@@ -163,7 +187,7 @@ with tab1:
                 elif ai_engine == "ChatGPT (OpenAI)":
                     with st.spinner("Processing through ChatGPT Veto Sieve..."):
                         try:
-                            client = OpenAI(api_key=user_api_key)
+                            client = OpenAI(api_key=active_api_key)
                             response = client.chat.completions.create(
                                 model="gpt-4o",
                                 messages=[{"role": "user", "content": prompt}]
