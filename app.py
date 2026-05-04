@@ -286,10 +286,18 @@ with col1:
     else:
         discovery_level = "N/A (Pre-Litigation)"
 
-    # ── Risk Flags ──
+# ── Risk Flags ──
     st.markdown("**Risk Flags** *(check all that apply)*")
-    government_entity   = st.checkbox("Government Entity Involved (TTCA / Sovereign Immunity)")
-    commercial_vehicle  = st.checkbox("Commercial Vehicle / FMCSR Applies")
+    government_entity = st.checkbox("Government Entity Involved (TTCA / Sovereign Immunity)")
+    
+    commercial_vehicle = st.checkbox("Commercial Vehicle Involved")
+    
+    # This is the "Nested Sieve"
+    interstate_applies = False
+    if commercial_vehicle:
+        # These only appear if the box above is checked
+        interstate_applies = st.checkbox("Interstate Commerce (Full FMCSR)")
+        st.caption("Check this if the vehicle crossed state lines or carries interstate cargo.")
 
     # ── Case Summary ──
     case_summary = st.text_area(
