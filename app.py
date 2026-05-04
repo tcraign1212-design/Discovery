@@ -141,8 +141,18 @@ with col1:
     
     # API Key Logic
     active_api_key = ""
-    if ai_engine == "Gemini (Google)":
-        active_api_key = st.text_input("Gemini API Key", value=env_gemini_key or "", type="password")
+   if ai_engine == "Gemini (Google)":
+                with st.spinner("Analyzing via Gemini..."):
+                    try:
+                        genai.configure(api_key=active_api_key)
+                        
+                        # THIS IS THE MISSING DEFINITION:
+                        model = genai.GenerativeModel("gemini-1.5-flash") 
+                        
+                        response = model.generate_content(prompt)
+                        output_text = response.text
+                    except Exception as e:
+                        st.error(f"Gemini error: {e}")
     elif ai_engine == "ChatGPT (OpenAI)":
         active_api_key = st.text_input("OpenAI API Key", value=env_openai_key or "", type="password")
     elif ai_engine == "Claude (Anthropic)":
