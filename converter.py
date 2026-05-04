@@ -4,14 +4,13 @@ import re
 import docx
 from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from pypdf import PdfReader
 import google.generativeai as genai
 from openai import OpenAI
 
 # 1. Page Configuration
-st.set_page_config(page_title="Discovery Drafter", layout="wide")
+st.set_page_config(page_title="Discovery Drafter & Utility", layout="wide")
 
-st.title("Legal Utility: Discovery Response Drafter")
+st.title("Legal Utility: Bulk Discovery Response Drafter")
 st.markdown("---")
 
 # 2. Complete Taxonomy of Objections
@@ -31,24 +30,24 @@ TAXONOMY_OBJECTIONS = {
     "OB-TX-026: Request Requires Creation of a Document": "Plaintiff objects because this request improperly requires Plaintiff to create a document that does not presently exist."
 }
 
-# 3. Predictable Document Generation Function
-def generate_precise_docx(header_text, subparts_text, answer_text, objections_list, use_styling=False, case_info=None):
+# 3. Secure Document Generation Logic
+def generate_precise_docx(full_content, use_styling=False, case_info=None):
     doc = docx.Document()
     
-    # Page setup: 1-inch margins
+    # 1-inch margins
     for section in doc.sections:
         section.top_margin = Inches(1)
         section.bottom_margin = Inches(1)
         section.left_margin = Inches(1)
         section.right_margin = Inches(1)
 
-    # Base Font: Times New Roman 12
+    # Base Font Setup (Times New Roman 12pt)
     style_normal = doc.styles['Normal']
     font = style_normal.font
     font.name = 'Times New Roman'
     font.size = Pt(12)
 
-    # Optional Case Style Box
+    # Add Case Style Box if requested
     if use_styling and case_info:
         table = doc.add_table(rows=1, cols=2)
         table.autofit = False
@@ -67,122 +66,205 @@ def generate_precise_docx(header_text, subparts_text, answer_text, objections_li
         p_right.paragraph_format.line_spacing = 1.15
         p_right.add_run(f"§\tIN THE DISTRICT COURT\n§\n§\n§\t{case_info.get('court', '')}\n§\n§\t{case_info.get('county', '')} COUNTY, TEXAS")
         
-        doc.add_paragraph().paragraph_format.space_before = Pt(12)
+        p_spacer = doc.add_paragraph()
+        p_spacer.paragraph_format.space_before = Pt(12)
 
-    # 1. Add the Request Header (e.g., INTERROGATORY NO. 1: Please generally describe...)
-    p_header = doc.add_paragraph()
-    p_header.paragraph_format.space_before = Pt(12)
-    p_header.paragraph_format.space_after = Pt(4)
-    p_header.paragraph_format.line_spacing = 1.15
-    p_header.paragraph_format.left_indent = Inches(0)
+    # Main Title
+    p_title = doc.add_paragraph()
+    p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_title.paragraph_format.space_after = Pt(18)
+    p_title.paragraph_format.space_before = Pt(6)
+    run_title = p_title.add_run("PLAINTIFF’S RESPONSES AND OBJECTIONS TO DEFENDANT’S DISCOVERY")
+    run_title.font.bold = True
+    run_title.font.size = Pt(12)
+
+    # Split output by exact discovery item markers
+    item_regex = re.compile(r'(?=(?:INTERROGATORY|REQUEST FOR PRODUCTION|REQUEST FOR ADMISSION)\s+NO\.\s*\d+[:\s])', re.IGNORECASE)
+    items = item_regex.split(full_content)
     
-    # Split header text to only bold the identifier
-    match = re.match(r'^((?:INTERROGATORY|REQUEST FOR PRODUCTION|REQUEST FOR ADMISSION)\s+NO\.\s*\d+:)\s*(.*)$', header_text, re.IGNORECASE)
-    if match:
-        run_bold = p_header.add_run(match.group(1) + " ")
-        run_bold.font.bold = True
-        p_header.add_run(match.group(2))
-    else:
-        p_header.add_run(header_text)
+    subpart_regex = re.compile(r'^(?:[a-g1-9]\.|\([a-g1-9]\))\s', re.IGNORECASE)
 
-    # 2. Add subparts with explicit 0.5-inch indentation
-    if subparts_text:
-        subparts_lines = [line.strip() for line in subparts_text.split('\n') if line.strip()]
-        for line in subparts_lines:
-            p_sub = doc.add_paragraph()
-            p_sub.paragraph_format.left_indent = Inches(0.5)
-            p_sub.paragraph_format.space_after = Pt(4)
-            p_sub.paragraph_format.line_spacing = 1.15
-            p_sub.add_run(line)
+    for item in items:
+        cleaned_item = item.strip()
+        if not cleaned_item:
+            continue
 
-    # 3. Add the Answer Keyword Exactly
-    p_ans = doc.add_paragraph()
-    p_ans.paragraph_format.space_before = Pt(8)
-    p_ans.paragraph_format.space_after = Pt(6)
-    p_ans.paragraph_format.left_indent = Inches(0)
-    run_ans = p_ans.add_run(answer_text if answer_text else "ANSWER:")
-    run_ans.font.bold = True
+        lines = cleaned_item.split('\n')
+        for line in lines:
+            cleaned_line = line.strip()
+            if not cleaned_line:
+                continue
 
-    # 4. Append Objections
-    if objections_list:
-        p_obj = doc.add_paragraph()
-        p_obj.paragraph_format.left_indent = Inches(0)
-        p_obj.paragraph_format.space_after = Pt(6)
-        p_obj.paragraph_format.line_spacing = 1.15
-        p_obj.add_run(" ".join(objections_list))
+            p = doc.add_paragraph()
+            p.paragraph_format.line_spacing = 1.15
+            p.paragraph_format.space_after = Pt(6)
 
-    # Save to buffer
+            upper_line = cleaned_line.upper()
+
+            # Format 1: Discovery Item Headers
+            if any(x in upper_line for x in ["INTERROGATORY NO.", "REQUEST FOR PRODUCTION NO.", "REQUEST FOR ADMISSION NO."]):
+                # Bold only the item prefix up to the colon
+                match = re.match(r'^((?:INTERROGATORY|REQUEST FOR PRODUCTION|REQUEST FOR ADMISSION)\s+NO\.\s*\d+[:\s]*)\s*(.*)$', cleaned_line, re.IGNORECASE)
+                if match:
+                    run_bold = p.add_run(match.group(1) + " ")
+                    run_bold.font.bold = True
+                    p.add_run(match.group(2))
+                else:
+                    p.add_run(cleaned_line)
+                p.paragraph_format.space_before = Pt(14)
+                p.paragraph_format.space_after = Pt(6)
+
+            # Format 2: Direct Answers or Response Strings
+            elif upper_line.startswith("ANSWER:") or upper_line.startswith("RESPONSE:"):
+                run = p.add_run(cleaned_line)
+                run.font.bold = True
+                p.paragraph_format.left_indent = Inches(0)
+                p.paragraph_format.space_before = Pt(6)
+                p.paragraph_format.space_after = Pt(6)
+
+            # Format 3: Subparts
+            elif subpart_regex.match(cleaned_line):
+                p.paragraph_format.left_indent = Inches(0.5)
+                p.paragraph_format.space_after = Pt(4)
+                p.add_run(cleaned_line)
+
+            # Format 4: Normal Content
+            else:
+                p.paragraph_format.left_indent = Inches(0)
+                # Parse markdown boldings if present
+                if "**" in cleaned_line:
+                    parts = cleaned_line.split('**')
+                    for index, part in enumerate(parts):
+                        if index % 2 == 1:
+                            p.add_run(part).font.bold = True
+                        else:
+                            p.add_run(part)
+                else:
+                    p.add_run(cleaned_line)
+
     buffer = io.BytesIO()
     doc.save(buffer)
     buffer.seek(0)
     return buffer
 
-# --- TABBED INTERFACE ---
-tab1, tab2 = st.tabs(["📄 Direct Docx Generator", "🤖 AI Assisted Drafter"])
+# --- TAB INTERFACE ---
+tab1, tab2 = st.tabs(["⚖️ Bulk Discovery Drafter", "🛠 Setup Settings"])
 
-with tab1:
-    st.subheader("Direct Layout Control (Zero Guessing)")
-    st.info("Input your discovery item piece by piece below. This enforces the exact spacing, bolding, and indentation rules.")
+with tab2:
+    st.subheader("Model and Case Information Setup")
+    
+    ai_engine = st.radio("Select Inference Model Engine:", ["Gemini", "ChatGPT"], horizontal=True)
+    api_key = st.text_input(f"Enter your {ai_engine} API Key", type="password")
+    
+    st.markdown("---")
+    use_case = st.checkbox("Include Style Box at Top?", value=True)
     
     c1, c2 = st.columns(2)
     with c1:
-        use_case = st.checkbox("Include Case Style Box?", value=True, key="c_style_1")
         cause = st.text_input("Cause No.", value="DC-25-23025")
         plaintiff = st.text_input("Plaintiff", value="MIGUEL ORTIZ")
-        defendant = st.text_input("Defendant", value="GAMALIEL MORALES BAUTISTA")
         court = st.text_input("Court", value="160th Judicial District")
+    with c2:
+        defendant = st.text_input("Defendant", value="GAMALIEL MORALES BAUTISTA")
         county = st.text_input("County", value="Dallas")
 
-    with c2:
-        req_type = st.selectbox("Document Answer Type", ["ANSWER:", "RESPONSE:"], key="ans_type_1")
+
+with tab1:
+    st.subheader("1. Input Discovery Request Block")
+    
+    selected_objections = st.multiselect(
+        "Apply Candidate Objections:", 
+        list(TAXONOMY_OBJECTIONS.keys())
+    )
+    
+    raw_discovery_input = st.text_area(
+        "Paste Raw Incoming Discovery Block", 
+        height=250, 
+        placeholder="Paste multiple Interrogatories, RFPs, or RFAs here exactly as received."
+    )
+    
+    factual_basis_input = st.text_area(
+        "Enter Factual Basis Details", 
+        height=100, 
+        placeholder="What actually occurred or what do we have? (Applies to all questions in this batch)"
+    )
+    
+    if st.button("Generate Final Discovery Document", type="primary"):
+        if not raw_discovery_input:
+            st.warning("Please paste raw discovery text first.")
+        elif not api_key:
+            st.error("Please configure your API Key in the Setup Settings tab.")
+        else:
+            objection_text = "\n".join([f"- {TAXONOMY_OBJECTIONS[obj]}" for obj in selected_objections])
+            
+            prompt = f"""You are a legal discovery drafting engine. Output the completely formatted discovery text.
+
+RAW INCOMING DISCOVERY INPUT:
+\"\"\"{raw_discovery_input}\"\"\"
+
+PLAINTIFF'S FACTUAL BASIS OR DIRECT RESPONSE:
+"{factual_basis_input if factual_basis_input else "None."}"
+
+CANDIDATE OBJECTIONS TO BE INCLUDED BEFORE THE FACTUAL RESPONSE:
+{objection_text if objection_text else "None."}
+
+STRICT OUTPUT STRUCTURING RULES:
+1. Output ALL discovery requests exactly as received.
+2. Under each distinct discovery request, format the response exactly in this order:
+   A. Write "ANSWER:" for Interrogatories/Admissions or "RESPONSE:" for Requests for Production.
+   B. Output the applied objections text.
+   C. Write the phrase on a single line exactly: "**Subject to and without waiving the foregoing, Plaintiff responds as follows:**"
+   D. Output the Factual Basis details cleanly.
+3. No opening conversational phrases or conversational text. Start directly with the first discovery header.
+"""
+            
+            output_text = ""
+            
+            if ai_engine == "Gemini":
+                with st.spinner("Generating output via Gemini AI..."):
+                    try:
+                        genai.configure(api_key=api_key)
+                        model = genai.GenerativeModel("gemini-2.5-flash")
+                        response = model.generate_content(prompt)
+                        output_text = response.text
+                    except Exception as e:
+                        st.error(f"Error calling Gemini AI: {e}")
+                            
+            elif ai_engine == "ChatGPT":
+                with st.spinner("Generating output via ChatGPT AI..."):
+                    try:
+                        client = OpenAI(api_key=api_key)
+                        response = client.chat.completions.create(
+                            model="gpt-4o",
+                            messages=[{"role": "user", "content": prompt}]
+                        )
+                        output_text = response.choices[0].message.content
+                    except Exception as e:
+                        st.error(f"Error calling ChatGPT AI: {e}")
+            
+            if output_text:
+                st.session_state["final_doc_output"] = output_text
+                st.success("Responses processed and built.")
+
+    if "final_doc_output" in st.session_state:
+        st.markdown("---")
+        st.subheader("2. Export Document Layout")
         
-        req_header = st.text_input(
-            "Request Title and Main Question", 
-            value="INTERROGATORY NO. 1: Please generally describe the Incident in Question, including:"
-        )
-        
-        req_subparts = st.text_area(
-            "Request Subparts (Each line here is indented exactly 0.5 inches)", 
-            value="(a) the time You arrived at the Store;\n(b) the purpose for which You traveled to the Store;\n(c) who accompanied You to the store;"
-        )
-        
-        chosen_objections = st.multiselect(
-            "Apply Candidate Objections", 
-            list(TAXONOMY_OBJECTIONS.keys()), 
-            key="objs_1"
-        )
-        
-    if st.button("Download Exact Docx Layout", type="primary"):
-        case_dict = {"cause_no": cause, "plaintiff": plaintiff, "defendant": defendant, "court": court, "county": county}
-        
-        obj_text_list = [TAXONOMY_OBJECTIONS[obj] for obj in chosen_objections]
+        case_dict = {"cause_no": cause, "plaintiff": plaintiff, "defendant": defendant, "court": court, "county": county} if use_case else None
         
         doc_buffer = generate_precise_docx(
-            header_text=req_header,
-            subparts_text=req_subparts,
-            answer_text=req_type,
-            objections_list=obj_text_list,
+            full_content=st.session_state["final_doc_output"],
             use_styling=use_case,
             case_info=case_dict
         )
         
         st.download_button(
-            label="📥 Download Perfectly Formatted Word File",
+            label="📥 Download Correctly Formatted Word File",
             data=doc_buffer,
-            file_name="Compliant_Discovery.docx",
+            file_name="Compliant_Discovery_Document.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             use_container_width=True
         )
-
-with tab2:
-    st.subheader("AI Objections Generation")
-    
-    ai_engine = st.radio("Select AI Inference Engine:", ["Gemini", "OpenAI"], horizontal=True)
-    api_key = st.text_input("API Key", type="password")
-    
-    raw_req = st.text_area("Paste Incoming Question Here")
-    factual_basis = st.text_area("Factual Basis for Answer")
-    
-    if st.button("Process using AI"):
-        st.info("Obtaining objection recommendations...")
-        # Integrates clean completions for tab 2...
+        
+        st.markdown("#### Preview Output")
+        st.text(st.session_state["final_doc_output"])
