@@ -5,6 +5,7 @@ from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 import google.generativeai as genai
 from openai import OpenAI
+import anthropic
 import os
 
 # 1. Page Configuration
@@ -17,6 +18,7 @@ st.markdown("---")
 # Looks for default keys stored in system settings or environment variables
 env_gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
 env_openai_key = st.secrets.get("OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY")
+env_anthropic_key = st.secrets.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
 
 # --- DOCUMENT GENERATION FUNCTIONS ---
 
@@ -74,13 +76,13 @@ with tab1:
         # User AI Engine Selection
         ai_engine = st.radio(
             "Select Inference Model Engine:",
-            ["Gemini (Google)", "ChatGPT (OpenAI)"],
+            ["Gemini (Google)", "ChatGPT (OpenAI)", "Claude (Anthropic)"],
             horizontal=True
         )
         
         active_api_key = ""
         
-        # Streamlit securely captures user inputs or defaults to your environment variables
+        # Dynamic API key entry logic
         if ai_engine == "Gemini (Google)":
             if env_gemini_key:
                 active_api_key = st.text_input(
@@ -105,7 +107,20 @@ with tab1:
                 active_api_key = st.text_input(
                     "Required: Enter your personal OpenAI (ChatGPT) API Key",
                     type="password",
-                    placeholder="sk-... (This key is not logged or stored on the server)"
+                    placeholder="sk-... (AI key is not logged or stored on the server)"
+                )
+        elif ai_engine == "Claude (Anthropic)":
+            if env_anthropic_key:
+                active_api_key = st.text_input(
+                    "Optional: Enter your own Anthropic API Key to override default settings",
+                    value=env_anthropic_key,
+                    type="password"
+                )
+            else:
+                active_api_key = st.text_input(
+                    "Required: Enter your personal Anthropic (Claude) API Key",
+                    type="password",
+                    placeholder="sk-ant-... (AI key is not logged or stored on the server)"
                 )
         
         st.markdown("---")
@@ -201,34 +216,13 @@ with tab1:
                             output_text = response.choices[0].message.content
                         except Exception as e:
                             st.error(f"Error calling ChatGPT AI: {e}")
-                
-                if output_text:
-                    st.success("Case Audit Generated Successfully")
-                    st.session_state["last_audit_output"] = output_text
 
-        # 4. Display Persistent Downloads
-        if "last_audit_output" in st.session_state:
-            output_text = st.session_state["last_audit_output"]
-            
-            st.markdown("### Export Report to Word")
-            docx_data = generate_audit_docx(output_text)
-            st.download_button(
-                label="📥 Download Audit Report (.docx)",
-                data=docx_data,
-                file_name="Case_Workflow_Veto_Report.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                use_container_width=True
-            )
-            
-            st.markdown("---")
-            st.markdown(output_text)
-
-with tab2:
-    st.markdown("""
-    ### The Veto Philosophy
-    Building elite case-management processes means setting up mechanical safeguards that catch issues before they turn into major liabilities.
-    
-    * **Statute of Limitations:** Tracks critical countdown metrics to stop procedural defaults.
-    * **Causation Integrity:** Catches treatment gaps and pre-existing injury issues before defense discovery can exploit them.
-    * **Lien/Coverage Squeezes:** Compares total medical costs against available policy coverage early, avoiding unprofitable settlements down the line.
-    """)
+                elif ai_engine == "Claude (Anthropic)":
+                    with st.spinner("Processing through Claude Veto Sieve..."):
+                        try:
+                            client = anthropic.Anthropic(api_key=active_api_key)
+                            response = client.messages.create(
+                                model="claude-3-5-sonnet-20241022",
+                                max_tokens=2500,
+                                messages=[{"role": "user", "content": prompt}]
+                            )
