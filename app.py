@@ -160,7 +160,8 @@ with col2:
                 if ai_engine == "Gemini (Google)":
                     with st.spinner("Gemini analyzing..."):
                         genai.configure(api_key=active_key)
-                        model = genai.GenerativeModel("gemini-1.5-flash")
+                        # Changed from 'gemini-1.5-flash' to 'gemini-1.5-flash-latest'
+                        model = genai.GenerativeModel("gemini-1.5-flash-latest")
                         st.session_state["brief_content"] = model.generate_content(prompt).text
                 elif ai_engine == "ChatGPT (OpenAI)":
                     with st.spinner("OpenAI analyzing..."):
