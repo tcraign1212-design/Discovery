@@ -235,22 +235,25 @@ def convert_pdf_text_to_docx(pdf_file):
 
 def generate_response_docx(content_text):
     """
-    Builds a pristine, court-ready discovery document. 
-    Strips markdown artifacts, handles headers, and applies bolding cleanly.
+    Advanced discovery drafting engine. Automatically detects legal patterns 
+    and applies court-standard bolding, spacing, and clean styling.
     """
     doc = docx.Document()
+    
+    # Set 1-inch margins
     for section in doc.sections:
         section.top_margin = Inches(1)
         section.bottom_margin = Inches(1)
         section.left_margin = Inches(1)
         section.right_margin = Inches(1)
 
+    # Base font style: Times New Roman 12pt
     style_normal = doc.styles['Normal']
     font = style_normal.font
     font.name = 'Times New Roman'
     font.size = Pt(12)
 
-    # 1. Title Block
+    # 1. Pleading Title Block
     p_title = doc.add_paragraph()
     p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p_title.paragraph_format.space_after = Pt(6)
@@ -258,13 +261,13 @@ def generate_response_docx(content_text):
     run_title.font.bold = True
     run_title.font.size = Pt(12)
     
-    # 2. Add separator rule line
+    # 2. Add structural separator line
     p_sep = doc.add_paragraph()
     p_sep.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p_sep.paragraph_format.space_after = Pt(12)
+    p_sep.paragraph_format.space_after = Pt(18)
     p_sep.add_run("______________________________________________________________________")
 
-    # 3. Clean line parsing
+    # 3. Text parsing and pattern detection
     lines = content_text.split('\n')
     for line in lines:
         cleaned_line = line.strip()
@@ -272,27 +275,43 @@ def generate_response_docx(content_text):
             continue
             
         p = doc.add_paragraph()
-        p.paragraph_format.space_after = Pt(10)
+        # Apply standard legal 1.15 line spacing and space after paragraph
+        p.paragraph_format.space_after = Pt(12)
         p.paragraph_format.line_spacing = 1.15
         
-        # Check for Markdown Heading formatting (e.g. ### Header or ## Header)
-        if cleaned_line.startswith('###') or cleaned_line.startswith('##'):
+        # Pattern A: Detect discovery headers (e.g., INTERROGATORY NO. 1:, REQUEST NO. 2:)
+        if (cleaned_line.upper().startswith("INTERROGATORY") or 
+            cleaned_line.upper().startswith("REQUEST FOR PRODUCTION") or 
+            cleaned_line.upper().startswith("REQUEST NO.")):
+            
+            # Bold the header entirely for scannability
+            run = p.add_run(cleaned_line)
+            run.font.bold = True
+            
+        # Pattern B: Detect answer or response flags (e.g., ANSWER:, RESPONSE:)
+        elif cleaned_line.upper() in ["ANSWER:", "RESPONSE:"]:
+            run = p.add_run(cleaned_line)
+            run.font.bold = True
+            # Add a slight indent to simulate standard pleading alignment
+            p.paragraph_format.left_indent = Inches(0.5)
+            
+        # Pattern C: Remove markdown heading characters but keep text bolded
+        elif cleaned_line.startswith('###') or cleaned_line.startswith('##'):
             text_run = cleaned_line.replace('#', '').strip()
             run = p.add_run(text_run)
             run.font.bold = True
             
-        # Check for inline double asterisks **Text**
+        # Pattern D: Parse any inline markdown bolding markers (e.g., **Subject to...**)
         elif '**' in cleaned_line:
-            # Tokenize line to extract text that should be bolded
             parts = cleaned_line.split('**')
             for index, part in enumerate(parts):
-                if index % 2 == 1:  # Inside asterisks -> make bold
+                if index % 2 == 1:  # Inside double asterisks -> bold
                     run = p.add_run(part)
                     run.font.bold = True
-                else:  # Outside asterisks -> normal text
+                else:  # Outside double asterisks -> normal text
                     run = p.add_run(part)
         else:
-            # Standard output
+            # Standard, unformatted text line
             p.add_run(cleaned_line)
 
     buffer = io.BytesIO()
