@@ -251,6 +251,222 @@ def generate_response_docx(content_text, include_styling_box=False, style_detail
 
         upper_line = cleaned_line.upper()
 
-        # Target dynamic headers directly
-        is_discovery_header = ()
-            "INTERROGATORY NO" in upper_line or
+        # Dynamic matching
+        is_discovery_header = (
+            "INTERROGATORY NO" in upper_line or 
+            "REQUEST NO" in upper_line or 
+            "REQUEST FOR PRODUCTION NO" in upper_line or 
+            "REQUEST FOR ADMISSION NO" in upper_line
+        )
+
+        is_answer_header = (
+            upper_line.startswith("ANSWER") or 
+            upper_line.startswith("RESPONSE")
+        )
+
+        if is_discovery_header:
+            run = p.add_run(cleaned_line)
+            run.font.bold = True
+            p.paragraph_format.space_before = Pt(14)
+            p.paragraph_format.space_after = Pt(4)
+            
+        elif is_answer_header:
+            run = p.add_run(cleaned_line)
+            run.font.bold = True
+            p.paragraph_format.left_indent = Inches(0.25)
+            p.paragraph_format.space_after = Pt(6)
+            
+        elif "**" in cleaned_line:
+            parts = cleaned_line.split('**')
+            for index, part in enumerate(parts):
+                if index % 2 == 1:
+                    run = p.add_run(part)
+                    run.font.bold = True
+                else:
+                    run = p.add_run(part)
+        else:
+            p.add_run(cleaned_line)
+
+    buffer = io.BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+
+# 3. Streamlit Tab UI
+tab1, tab2 = st.tabs(["📄 Convert PDF to Word", "⚖️ Discovery Response Drafter"])
+
+# --- TAB 1: PDF TO WORD ---
+with tab1:
+    st.subheader("Direct PDF to Word Converter")
+    st.info("Upload any plain text PDF to convert it directly into an editable Word (.docx) file.")
+    
+    uploaded_pdf = st.file_uploader("Upload PDF File", type=["pdf"])
+    
+    if uploaded_pdf:
+        with st.spinner("Parsing PDF text and building Word document..."):
+            docx_buffer = convert_pdf_text_to_docx(uploaded_pdf)
+            st.success("Conversion successful!")
+            
+            base_name = os.path.splitext(uploaded_pdf.name)[0]
+            st.download_button(
+                label=f"📥 Download '{base_name}.docx'",
+                data=docx_buffer,
+                file_name=f"{base_name}.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
+
+# --- TAB 2: DISCOVERY RESPONSE DRAFTER ---
+with tab2:
+    col1, col2 = st.columns([1, 1])
+
+    with col1:
+        st.subheader("1. Setup Objections & Workflow")
+        
+        ai_engine = st.radio(
+            "Select Inference Model Engine:",
+            ["Gemini (Google)", "ChatGPT (OpenAI)"],
+            horizontal=True
+        )
+        
+        user_api_key = st.text_input(
+            f"Required: Enter your personal {ai_engine} API Key",
+            type="password",
+            placeholder="Key is not logged or stored"
+        )
+        
+        st.markdown("---")
+        
+        # Dynamic case styling toggle
+        use_case_styling = st.checkbox("Include Case Styling Box at Top?", value=True)
+        
+        cause_no = ""
+        plaintiff = ""
+        defendant = ""
+        court = ""
+        county = ""
+        
+        if use_case_styling:
+            c1, c2 = st.columns(2)
+            with c1:
+                cause_no = st.text_input("Cause No.", value="DC-25-23025")
+                plaintiff = st.text_input("Plaintiff", value="MIGUEL ORTIZ")
+                court = st.text_input("Court", value="160th Judicial District")
+            with c2:
+                defendant = st.text_input("Defendant", value="GAMALIEL MORALES BAUTISTA")
+                county = st.text_input("County", value="Dallas")
+            
+            st.markdown("---")
+
+        request_type = st.selectbox(
+            "Discovery Type", 
+            ["Requests for Production (RFPs)", "Interrogatories (ROGs)", "Requests for Admissions (RFAs)"]
+        )
+        
+        selected_objections = st.multiselect(
+            "Select Candidate Objections to Screen & Apply:",
+            list(TAXONOMY_OBJECTIONS.keys())
+        )
+        
+        incoming_request = st.text_area(
+            "Paste Defendant's Exact Question",
+            height=130,
+            placeholder="e.g., Interrogatory No. 1: Please state your full name..."
+        )
+        
+        factual_basis = st.text_area(
+            "Enter Factual Answer/Response details",
+            height=100,
+            placeholder="What actually occurred or what do we have?"
+        )
+        
+        run_button = st.button("Generate Final Discovery Response", type="primary")
+
+    with col2:
+        st.subheader("2. Live Response Preview")
+        
+        if run_button:
+            if not incoming_request:
+                st.warning("Please paste the defendant's request first.")
+            elif not user_api_key:
+                st.error(f"Please provide your personal {ai_engine} API Key.")
+            else:
+                objection_text = "\n".join([f"- {TAXONOMY_OBJECTIONS[obj]}" for obj in selected_objections])
+                
+                prompt = f"""You are a meticulous legal discovery drafting engine. Your job is to output a direct legal response.
+
+INCOMING REQUEST TYPE: {request_type}
+DEFENDANT'S REQUEST:
+"{incoming_request}"
+
+PLAINTIFF'S FACTUAL RESPONSE:
+"{factual_basis if factual_basis else "Plaintiff has provided no additional information at this time."}"
+
+THE SELECTED CANDIDATE OBJECTIONS TO APPLY:
+{objection_text if objection_text else "None."}
+
+STRICT RESPONSE RULES:
+1. Avoid general opening context statements or conversation. Do not say "Here is your response".
+2. Do not use Markdown formatting characters like '#' or '*' in your output unless wrapping a heading.
+3. First, type out the exact text of the relevant objections applied.
+4. Directly after the objections, output: "**Subject to and without waiving the foregoing, Plaintiff responds as follows:**"
+5. Add the factual response text.
+"""
+                
+                output_text = ""
+                
+                if ai_engine == "Gemini (Google)":
+                    with st.spinner("Processing objections via Gemini..."):
+                        try:
+                            genai.configure(api_key=user_api_key)
+                            model = genai.GenerativeModel("gemini-2.5-flash")
+                            response = model.generate_content(prompt)
+                            output_text = response.text
+                        except Exception as e:
+                            st.error(f"Error calling Gemini AI: {e}")
+                                
+                elif ai_engine == "ChatGPT (OpenAI)":
+                    with st.spinner("Processing objections via ChatGPT..."):
+                        try:
+                            client = OpenAI(api_key=user_api_key)
+                            response = client.chat.completions.create(
+                                model="gpt-4o",
+                                messages=[{"role": "user", "content": prompt}]
+                            )
+                            output_text = response.choices[0].message.content
+                        except Exception as e:
+                            st.error(f"Error calling ChatGPT AI: {e}")
+                
+                if output_text:
+                    st.success("Draft Generated Successfully")
+                    st.session_state["last_responder_output"] = output_text
+
+        if "last_responder_output" in st.session_state:
+            output_text = st.session_state["last_responder_output"]
+            
+            st.markdown("### Export Word Document")
+            
+            case_info = {
+                "cause_no": cause_no,
+                "plaintiff": plaintiff,
+                "defendant": defendant,
+                "court": court,
+                "county": county
+            } if use_case_styling else None
+            
+            docx_data = generate_response_docx(
+                content_text=output_text, 
+                include_styling_box=use_case_styling, 
+                style_details=case_info
+            )
+            
+            st.download_button(
+                label="📥 Download Word File (.docx)",
+                data=docx_data,
+                file_name="Compliant_Discovery_Response.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                use_container_width=True
+            )
+            
+            st.markdown("---")
+            st.markdown(output_text)
