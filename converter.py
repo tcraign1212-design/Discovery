@@ -62,7 +62,7 @@ K40 = "OB-TX-040: Prejudicial Terms / Controverted Text"
 K41 = "OB-TX-041: All Written Complaints (Overbroad)"
 K42 = "OB-TX-042: Ex Parte Provider Communications"
 
-# Mapping Values
+# Standalone Values
 V1 = "Plaintiff objects to this request under TRCP 193.2 to the extent it seeks information not relevant to any party's claim or defense and is not within the permissible scope of discovery."
 V2 = "Plaintiff objects that this request is overly broad because it is not reasonably limited in time to the matters at issue in this litigation."
 V3 = "Plaintiff objects that this request is overly broad because it is not reasonably tailored to include only matters relevant to the issues in dispute."
@@ -231,7 +231,7 @@ def generate_response_docx(content_text, include_styling_box=False, style_detail
     run_title.font.bold = True
     run_title.font.size = Pt(12)
 
-    # Patterns matching subparts: e.g., 'a. ', 'b. ', '(a) ', '(b) '
+    # Clean matching for alphabetical or numeric subparts like (a) or a.
     subpart_regex = re.compile(r'^(?:[a-g1-9]\.|\([a-g1-9]\))\s')
 
     lines = content_text.split('\n')
@@ -239,61 +239,42 @@ def generate_response_docx(content_text, include_styling_box=False, style_detail
         cleaned_line = line.strip()
         if not cleaned_line:
             continue
-            
+
         p = doc.add_paragraph()
         p.paragraph_format.space_after = Pt(12)
         p.paragraph_format.line_spacing = 1.15
-        
-        # Strip internal markers if passed down
-        if cleaned_line.startswith('#'):
-            cleaned_line = cleaned_line.replace('#', '').strip()
 
         upper_line = cleaned_line.upper()
 
-        # Target absolute formatting matches
-        is_discovery_item = False
-        is_answer_item = False
-
-        # Specific keyword matching
+        # Isolate exactly matching discovery question headers
         if "INTERROGATORY NO." in upper_line:
-            is_discovery_item = True
-        elif "REQUEST FOR PRODUCTION NO." in upper_line:
-            is_discovery_item = True
-        elif "REQUEST FOR ADMISSION NO." in upper_line:
-            is_discovery_item = True
-        elif upper_line.startswith("ANSWER:") or upper_line.startswith("RESPONSE:"):
-            is_answer_item = True
-
-        if is_discovery_item:
-            # Parse prefix vs rest of the query
-            parts = re.split(r'(?i)(INTERROGATORY NO\.\s*\d+:|REQUEST FOR PRODUCTION NO\.\s*\d+:|REQUEST FOR ADMISSION NO\.\s*\d+:)', cleaned_line)
-            for part in parts:
-                p_part = part.strip()
-                if not p_part:
-                    continue
-                if any(x in p_part.upper() for x in ["INTERROGATORY", "REQUEST FOR PRODUCTION", "REQUEST FOR ADMISSION"]):
-                    run = p.add_run(part + " ")
-                    run.font.bold = True
-                else:
-                    p.add_run(part)
+            # Parse the text to only bold the "INTERROGATORY NO. X:" portion
+            match = re.match(r'^(INTERROGATORY\s+NO\.\s*\d+:)\s*(.*)$', cleaned_line, re.IGNORECASE)
+            if match:
+                run_header = p.add_run(match.group(1) + " ")
+                run_header.font.bold = True
+                p.add_run(match.group(2))
+            else:
+                p.add_run(cleaned_line)
             p.paragraph_format.space_before = Pt(14)
             p.paragraph_format.space_after = Pt(4)
 
-        elif is_answer_item:
+        # Separate and exactly bold the Answer/Response identifier
+        elif upper_line.startswith("ANSWER:") or upper_line.startswith("RESPONSE:"):
             run = p.add_run(cleaned_line)
             run.font.bold = True
             p.paragraph_format.left_indent = Inches(0)
             p.paragraph_format.space_before = Pt(6)
-            p.paragraph_format.space_after = Pt(6)
+            p.paragraph_format.space_after = Pt(12)
 
+        # Force a 0.5-inch indentation strictly on identified subparts
         elif subpart_regex.match(cleaned_line):
-            # Indent exactly .5" per request
             p.paragraph_format.left_indent = Inches(0.5)
             p.paragraph_format.space_after = Pt(4)
             p.add_run(cleaned_line)
 
+        # Normal text paragraph format
         else:
-            # Standard output format fallback
             if "**" in cleaned_line:
                 parts = cleaned_line.split('**')
                 for index, part in enumerate(parts):
@@ -376,7 +357,7 @@ with tab2:
 
         request_type = st.selectbox(
             "Discovery Type", 
-            ["Requests for Production (RFPs)", "Interrogatories (ROGs)", "Requests for Admissions (RFAs)"]
+            ["Interrogatories (ROGs)", "Requests for Production (RFPs)", "Requests for Admissions (RFAs)"]
         )
         
         selected_objections = st.multiselect(
@@ -387,7 +368,7 @@ with tab2:
         incoming_request = st.text_area(
             "Paste Defendant's Exact Question",
             height=130,
-            placeholder="e.g., Interrogatory No. 1: Please state your full name..."
+            placeholder="e.g., INTERROGATORY NO. 1: Please state your full name..."
         )
         
         factual_basis = st.text_area(
@@ -409,30 +390,33 @@ with tab2:
             else:
                 objection_text = "\n".join([f"- {TAXONOMY_OBJECTIONS[obj]}" for obj in selected_objections])
                 
-                prompt = f"""You are a meticulous legal discovery drafting engine. Your job is to output a direct legal response.
+                # Separate system directives clearly for explicit execution
+                prompt = f"""You are a meticulous legal discovery drafting engine. Output a final formatted discovery response.
 
 INCOMING REQUEST TYPE: {request_type}
-DEFENDANT'S REQUEST:
+DEFENDANT'S REQUEST TEXT:
 "{incoming_request}"
 
-PLAINTIFF'S FACTUAL RESPONSE:
-"{factual_basis if factual_basis else "Plaintiff has provided no additional information at this time."}"
+PLAINTIFF'S FACTUAL BASIS:
+"{factual_basis if factual_basis else "None."}"
 
-THE SELECTED CANDIDATE OBJECTIONS TO APPLY:
+APPLICABLE CANDIDATE OBJECTIONS TEXT:
 {objection_text if objection_text else "None."}
 
-STRICT RESPONSE RULES:
-1. Avoid general opening context statements or conversation. Do not say "Here is your response".
-2. Do not use Markdown formatting characters like '#' or '*' in your output unless wrapping a heading.
-3. First, type out the exact text of the relevant objections applied.
-4. Directly after the objections, output: "**Subject to and without waiving the foregoing, Plaintiff responds as follows:**"
-5. Add the factual response text.
+RESPONSE STRUCTURE RULES:
+1. First write the exactly matched header: INTERROGATORY NO. X: or REQUEST FOR PRODUCTION NO. X:
+2. Write the incoming request text as provided.
+3. Add any subparts exactly as supplied in separate lines.
+4. Add the line exactly as: "ANSWER:" or "RESPONSE:"
+5. Output the applied objections.
+6. Write the following phrase on a separate line: "**Subject to and without waiving the foregoing, Plaintiff responds as follows:**"
+7. Output the factual response details cleanly. Do not include introductory conversational text.
 """
                 
                 output_text = ""
                 
                 if ai_engine == "Gemini (Google)":
-                    with st.spinner("Processing objections via Gemini..."):
+                    with st.spinner("Generating output via Gemini AI..."):
                         try:
                             genai.configure(api_key=user_api_key)
                             model = genai.GenerativeModel("gemini-2.5-flash")
@@ -442,7 +426,7 @@ STRICT RESPONSE RULES:
                             st.error(f"Error calling Gemini AI: {e}")
                                 
                 elif ai_engine == "ChatGPT (OpenAI)":
-                    with st.spinner("Processing objections via ChatGPT..."):
+                    with st.spinner("Generating output via ChatGPT AI..."):
                         try:
                             client = OpenAI(api_key=user_api_key)
                             response = client.chat.completions.create(
