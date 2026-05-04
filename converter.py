@@ -11,10 +11,6 @@ from openai import OpenAI
 # 1. Page Configuration
 st.set_page_config(page_title="Discovery Drafter & Utility", layout="wide")
 
-# Retrieve master API keys
-gemini_master_key = os.environ.get("GEMINI_API_KEY")
-openai_master_key = os.environ.get("OPENAI_API_KEY")
-
 st.title("Legal Utility: PDF Converter & Discovery Response Drafter")
 st.markdown("---")
 
@@ -307,12 +303,20 @@ with tab2:
     with col1:
         st.subheader("1. Setup Objections & Workflow")
         
-        # Inference engine selection
+        # User explicitly adds their API Key in the UI
         ai_engine = st.radio(
             "Select Inference Model Engine:",
             ["Gemini (Google)", "ChatGPT (OpenAI)"],
             horizontal=True
         )
+        
+        user_api_key = st.text_input(
+            f"Required: Enter your personal {ai_engine} API Key",
+            type="password",
+            placeholder="Key will not be logged or saved to the server"
+        )
+        
+        st.markdown("---")
         
         request_type = st.selectbox(
             "Discovery Type", 
@@ -336,13 +340,6 @@ with tab2:
             placeholder="What actually occurred or what do we have? e.g., Plaintiff has had no prior motor vehicle accidents."
         )
         
-        # API Key Overrides
-        user_api_override = st.text_input(
-            f"Optional API Key Override (for {ai_engine})",
-            type="password",
-            placeholder="Paste your individual key if not using app default"
-        )
-        
         run_button = st.button("Generate Final Discovery Response", type="primary")
 
     with col2:
@@ -351,6 +348,8 @@ with tab2:
         if run_button:
             if not incoming_request:
                 st.warning("Please paste the defendant's request first.")
+            elif not user_api_key:
+                st.error(f"Please provide your personal {ai_engine} API Key.")
             else:
                 # Core prompting instruction logic
                 objection_text = "\n".join([f"- {TAXONOMY_OBJECTIONS[obj]}" for obj in selected_objections])
@@ -379,36 +378,28 @@ with tab2:
                 
                 output_text = ""
                 
-                # Execute inference using the user's engine choice
+                # Execute inference using the explicit User Key
                 if ai_engine == "Gemini (Google)":
-                    active_gemini_key = user_api_override if user_api_override else gemini_master_key
-                    if not active_gemini_key:
-                        st.error("No Gemini API key detected. Add it to secrets or your override.")
-                    else:
-                        with st.spinner("Processing objections through Gemini Veto Sieve..."):
-                            try:
-                                genai.configure(api_key=active_gemini_key)
-                                model = genai.GenerativeModel("gemini-2.5-flash")
-                                response = model.generate_content(prompt)
-                                output_text = response.text
-                            except Exception as e:
-                                st.error(f"Error calling Gemini AI: {e}")
+                    with st.spinner("Processing objections through Gemini Veto Sieve..."):
+                        try:
+                            genai.configure(api_key=user_api_key)
+                            model = genai.GenerativeModel("gemini-2.5-flash")
+                            response = model.generate_content(prompt)
+                            output_text = response.text
+                        except Exception as e:
+                            st.error(f"Error calling Gemini AI: {e}")
                                 
                 elif ai_engine == "ChatGPT (OpenAI)":
-                    active_openai_key = user_api_override if user_api_override else openai_master_key
-                    if not active_openai_key:
-                        st.error("No OpenAI API key detected. Add it to secrets or your override.")
-                    else:
-                        with st.spinner("Processing objections through ChatGPT Veto Sieve..."):
-                            try:
-                                client = OpenAI(api_key=active_openai_key)
-                                response = client.chat.completions.create(
-                                    model="gpt-4o",
-                                    messages=[{"role": "user", "content": prompt}]
-                                )
-                                output_text = response.choices[0].message.content
-                            except Exception as e:
-                                st.error(f"Error calling ChatGPT AI: {e}")
+                    with st.spinner("Processing objections through ChatGPT Veto Sieve..."):
+                        try:
+                            client = OpenAI(api_key=user_api_key)
+                            response = client.chat.completions.create(
+                                model="gpt-4o",
+                                messages=[{"role": "user", "content": prompt}]
+                            )
+                            output_text = response.choices[0].message.content
+                        except Exception as e:
+                            st.error(f"Error calling ChatGPT AI: {e}")
                 
                 if output_text:
                     st.success("Draft Generated Successfully")
