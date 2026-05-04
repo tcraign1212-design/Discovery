@@ -226,3 +226,10 @@ with tab1:
                                 max_tokens=2500,
                                 messages=[{"role": "user", "content": prompt}]
                             )
+                            output_text = response.content[0].text
+                        except Exception as e:
+                            st.error(f"Error calling Claude AI: {e}")
+                
+                if output_text:
+                    st.success("Case Audit Generated Successfully")
+                    st.session_state["last_audit_output"] = output_text
