@@ -9,12 +9,12 @@ import anthropic
 import os
 
 # ──────────────────────────────────────────────
-# 1. INITIALIZE SESSION STATE (Prevent Rebooting)
+# 1. INITIALIZE SESSION STATE (The "Memory" Sieve)
 # ──────────────────────────────────────────────
 if "brief_content" not in st.session_state:
     st.session_state["brief_content"] = ""
-if "active_api_key" not in st.session_state:
-    st.session_state["active_api_key"] = ""
+if "comm_status" not in st.session_state:
+    st.session_state["comm_status"] = "No"
 
 # ──────────────────────────────────────────────
 # 2. PAGE CONFIGURATION
@@ -25,13 +25,13 @@ st.title("Legal Utility: Case Intelligence Brief Generator")
 st.markdown("*Strategic case framing for pre-litigation intake and active litigation workup*")
 st.markdown("---")
 
-# API Keys from Secrets
+# API Keys from Secrets/Env
 env_gemini_key    = st.secrets.get("GEMINI_API_KEY")    or os.environ.get("GEMINI_API_KEY")
 env_openai_key    = st.secrets.get("OPENAI_API_KEY")    or os.environ.get("OPENAI_API_KEY")
 env_anthropic_key = st.secrets.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
 
 # ──────────────────────────────────────────────
-# 3. DOCUMENT GENERATION
+# 3. DOCUMENT GENERATION (Texas Format)
 # ──────────────────────────────────────────────
 def generate_brief_docx(brief_text: str, doc_title: str) -> io.BytesIO:
     doc = docx.Document()
@@ -75,17 +75,17 @@ def generate_brief_docx(brief_text: str, doc_title: str) -> io.BytesIO:
     return buffer
 
 # ──────────────────────────────────────────────
-# 4. PROMPT BUILDER
+# 4. PROMPT BUILDER (Operational Strategy)
 # ──────────────────────────────────────────────
-def build_prompt(case_stage, case_type, discovery_level, doi, sol, summary, gov, comm):
-    gov_txt = "\n- GOVERNMENT ENTITY: Apply TTCA analysis & notice deadlines." if gov else ""
-    cv_txt = "\n- COMMERCIAL/FMCSR: Identify carrier safety protocols & preservation." if comm else ""
+def build_prompt(stage, ctype, dlevel, doi, sol, summary, gov, comm_analysis):
+    gov_txt = "\n- GOVERNMENT ENTITY: Apply TTCA analysis and notice deadlines." if gov else ""
+    cv_txt = "\n- COMMERCIAL VEHICLE: Identify carrier safety protocols, driver files, and preservation needs." if comm_analysis else ""
     
-    params = f"Framework: {case_type}\nDOI: {doi}\nSOL: {sol}\nGov: {gov}\nComm: {comm}\n\nSummary:\n{summary}"
+    params = f"Framework: {ctype}\nDOI: {doi}\nSOL: {sol}\nGov Entity: {gov}\nComm Analysis: {comm_analysis}\n\nSummary:\n{summary}"
     
-    if case_stage == "Pre-Litigation":
+    if stage == "Pre-Litigation":
         return f"Draft a Texas Pre-Suit Brief. {params} {gov_txt}{cv_txt} Headers: ## 1. Chronology, ## 2. Liability, ## 3. Risk Flags, ## 4. Proof Gaps, ## 5. Defense Anticipation, ## 6. Action Items."
-    return f"Draft a Texas Litigation Blueprint. {params} Discovery Level: {discovery_level} {gov_txt}{cv_txt} Headers: ## 1. Chronology, ## 2. Liability, ## 3. Proof Gaps, ## 4. Defense Anticipation, ## 5. Discovery Blueprint, ## 6. Strategic Flags."
+    return f"Draft a Texas Litigation Blueprint. {params} Discovery Level: {dlevel} {gov_txt}{cv_txt} Headers: ## 1. Chronology, ## 2. Liability, ## 3. Proof Gaps, ## 4. Defense Anticipation, ## 5. Discovery Blueprint, ## 6. Strategic Flags."
 
 # ──────────────────────────────────────────────
 # 5. MAIN LAYOUT
@@ -97,13 +97,13 @@ with col1:
     case_stage = st.radio("Case Stage:", ["Pre-Litigation", "Active Litigation"], horizontal=True)
     ai_engine = st.radio("Model Engine:", ["Gemini (Google)", "ChatGPT (OpenAI)", "Claude (Anthropic)"], horizontal=True)
 
-    # API Key Input
+    # API Key Input (Persistent)
     if ai_engine == "Gemini (Google)":
-        st.session_state["active_api_key"] = st.text_input("Gemini API Key", value=env_gemini_key or "", type="password")
+        active_key = st.text_input("Gemini API Key", value=env_gemini_key or "", type="password")
     elif ai_engine == "ChatGPT (OpenAI)":
-        st.session_state["active_api_key"] = st.text_input("OpenAI API Key", value=env_openai_key or "", type="password")
+        active_key = st.text_input("OpenAI API Key", value=env_openai_key or "", type="password")
     else:
-        st.session_state["active_api_key"] = st.text_input("Anthropic API Key", value=env_anthropic_key or "", type="password")
+        active_key = st.text_input("Anthropic API Key", value=env_anthropic_key or "", type="password")
 
     st.markdown("---")
     case_type = st.selectbox("Framework:", ["Standard MVA", "Trucking", "Premises", "Workplace", "UM/UIM", "TTCA"])
@@ -114,10 +114,18 @@ with col1:
 
     st.markdown("**Risk Flags**")
     government_entity = st.checkbox("Government Entity Involved")
-    commercial_status = st.radio("Commercial Vehicle?", ["No", "Yes", "Unsure"], index=0, horizontal=True)
-    include_commercial_analysis = (commercial_status in ["Yes", "Unsure"])
+    
+    # FIX: Tie Commercial Status to Session State
+    st.session_state["comm_status"] = st.radio(
+        "Commercial Vehicle Involved?", 
+        ["No", "Yes", "Unsure"], 
+        index=0, 
+        horizontal=True
+    )
+    include_comm = (st.session_state["comm_status"] in ["Yes", "Unsure"])
 
-    case_summary = st.text_area("Case Summary", height=160)
+    case_summary = st.text_area("Case Summary", height=160, placeholder="Identify parties and incident mechanics...")
+    
     with st.expander("Dates"):
         date_of_incident = st.text_input("Incident Date", placeholder="YYYY-MM-DD")
         sol_date = st.text_input("SOL Date", placeholder="YYYY-MM-DD")
@@ -132,36 +140,34 @@ with col2:
 
     if run_brief:
         if not case_summary.strip():
-            st.warning("Please provide a case summary.")
-        elif not st.session_state["active_api_key"]:
-            st.error("Missing API Key.")
+            st.warning("VETO: Provide a case summary to filter for causation gaps.")
+        elif not active_key:
+            st.error("Engine Error: Missing API Key.")
         else:
-            prompt = build_prompt(case_stage, case_type, discovery_level, date_of_incident, sol_date, case_summary, government_entity, include_commercial_analysis)
+            prompt = build_prompt(case_stage, case_type, discovery_level, date_of_incident, sol_date, case_summary, government_entity, include_comm)
             
             try:
                 if ai_engine == "Gemini (Google)":
-                    with st.spinner("Gemini thinking..."):
-                        genai.configure(api_key=st.session_state["active_api_key"])
+                    with st.spinner("Gemini analyzing..."):
+                        genai.configure(api_key=active_key)
                         model = genai.GenerativeModel("gemini-1.5-flash")
                         st.session_state["brief_content"] = model.generate_content(prompt).text
                 elif ai_engine == "ChatGPT (OpenAI)":
-                    with st.spinner("OpenAI thinking..."):
-                        client = OpenAI(api_key=st.session_state["active_api_key"])
+                    with st.spinner("OpenAI analyzing..."):
+                        client = OpenAI(api_key=active_key)
                         response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
                         st.session_state["brief_content"] = response.choices[0].message.content
                 elif ai_engine == "Claude (Anthropic)":
-                    with st.spinner("Claude thinking..."):
-                        client = anthropic.Anthropic(api_key=st.session_state["active_api_key"])
+                    with st.spinner("Claude analyzing..."):
+                        client = anthropic.Anthropic(api_key=active_key)
                         response = client.messages.create(model="claude-3-5-sonnet-20240620", max_tokens=4000, messages=[{"role": "user", "content": prompt}])
                         st.session_state["brief_content"] = response.content[0].text
-                
-                st.session_state["brief_stage"] = case_stage
             except Exception as e:
-                st.error(f"Engine Error: {e}")
+                st.error(f"Integrity Error: {e}")
 
     if st.session_state["brief_content"]:
         edited_text = st.text_area("Edit Brief:", value=st.session_state["brief_content"], height=500)
         st.session_state["brief_content"] = edited_text
         
         docx_data = generate_brief_docx(st.session_state["brief_content"], "CASE INTELLIGENCE BRIEF")
-        st.download_button("📥 Download (.docx)", data=docx_data, file_name="Case_Brief.docx", use_container_width=True)
+        st.download_button("📥 Download (.docx)", data=docx_data, file_name="Case_Intelligence_Brief.docx", use_container_width=True)
