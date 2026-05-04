@@ -59,7 +59,7 @@ def generate_brief_docx(brief_text: str, doc_title: str) -> io.BytesIO:
 def build_prompt(stage, ctype, dlevel, doi, sol, summary, gov, cv_jurisdiction):
     gov_flag = "\n- GOV FLAG: Apply TTCA analysis and notice deadlines." if gov else ""
     cv_flag = ""
-    if ctype in ["Commercial Vehicle", "Commercial Vehicle / Trucking Crash"]:
+    if ctype == "Commercial Vehicle / Trucking Crash":
         cv_flag = f"\n- COMMERCIAL FLAG: Apply {cv_jurisdiction} analysis. Focus on FMCSR/TX-DOT standards."
     
     params = f"Framework: {ctype}\nDOI: {doi}\nSOL: {sol}\nGov Entity: {gov}\n\nSummary:\n{summary}"
@@ -77,11 +77,11 @@ with col1:
     ai_engine = st.radio("Select Model Engine:", ["Gemini (Google)", "ChatGPT (OpenAI)", "Claude (Anthropic)"], horizontal=True)
 
     if ai_engine == "Gemini (Google)":
-        active_api_key = st.text_input("Gemini API Key", value=env_gemini_key or "", type="password")
+        active_api_key = st.text_input("Gemini API Key", value=env_gemini_key or "", type="password", key="gem_p")
     elif ai_engine == "ChatGPT (OpenAI)":
-        active_api_key = st.text_input("OpenAI API Key", value=env_openai_key or "", type="password")
+        active_api_key = st.text_input("OpenAI API Key", value=env_openai_key or "", type="password", key="gpt_p")
     else:
-        active_api_key = st.text_input("Anthropic API Key", value=env_anthropic_key or "", type="password")
+        active_api_key = st.text_input("Anthropic API Key", value=env_anthropic_key or "", type="password", key="ant_p")
 
     st.markdown("---")
     case_type = st.selectbox(
@@ -97,7 +97,7 @@ with col1:
     )
 
     cv_jurisdiction = "N/A"
-    if "Commercial Vehicle" in case_type:
+    if case_type == "Commercial Vehicle / Trucking Crash":
         cv_jurisdiction = st.radio("FMCSR Scope:", ["Interstate (Federal)", "Intrastate (Texas)", "Unsure"], index=2, horizontal=True)
 
     discovery_level = st.radio("Discovery Level:", ["Level 1", "Level 2", "Level 3"], index=1, horizontal=True) if case_stage == "Active Litigation" else "N/A"
@@ -115,29 +115,28 @@ with col2:
     st.subheader("2. Case Intelligence Brief")
     if run_brief:
         if not case_summary.strip():
-            st.warning("Please provide a case summary.")
+            st.warning("Veto: Provide a case summary.")
         elif not active_api_key:
-            st.error(f"Please enter an API key.")
+            st.error("Integrity Error: Missing API Key.")
         else:
             prompt = build_prompt(case_stage, case_type, discovery_level, date_of_incident, sol_date, case_summary, government_entity, cv_jurisdiction)
             
             output_text = ""
             try:
                 if ai_engine == "Gemini (Google)":
-                with st.spinner("Analyzing via Gemini..."):
-                    try:
+                    with st.spinner("Analyzing via Gemini..."):
                         genai.configure(api_key=active_api_key)
-                        # This is the stable production anchor
+                        # Use the specific production anchor to clear 404
                         model = genai.GenerativeModel("gemini-1.5-flash")
                         response = model.generate_content(prompt)
                         output_text = response.text
-                    except Exception as e:
-                        st.error(f"Gemini error: {e}")
+                
                 elif ai_engine == "ChatGPT (OpenAI)":
                     with st.spinner("Analyzing via OpenAI..."):
                         client = OpenAI(api_key=active_api_key)
                         response = client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt}])
                         output_text = response.choices[0].message.content
+                
                 elif ai_engine == "Claude (Anthropic)":
                     with st.spinner("Analyzing via Claude..."):
                         client = anthropic.Anthropic(api_key=active_api_key)
@@ -146,8 +145,9 @@ with col2:
                 
                 if output_text:
                     st.session_state["brief_content"] = output_text
+            
             except Exception as e:
-                st.error(f"Error: {e}")
+                st.error(f"Execution Error: {e}")
 
     if st.session_state["brief_content"]:
         edited_text = st.text_area("Edit Brief:", value=st.session_state["brief_content"], height=500)
