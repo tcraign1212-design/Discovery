@@ -124,12 +124,15 @@ with col2:
             output_text = ""
             try:
                 if ai_engine == "Gemini (Google)":
-                    with st.spinner("Analyzing via Gemini..."):
+                with st.spinner("Analyzing via Gemini..."):
+                    try:
                         genai.configure(api_key=active_api_key)
-                        # RESTORED TO STABLE PRODUCTION MODEL
+                        # This is the stable production anchor
                         model = genai.GenerativeModel("gemini-1.5-flash")
                         response = model.generate_content(prompt)
                         output_text = response.text
+                    except Exception as e:
+                        st.error(f"Gemini error: {e}")
                 elif ai_engine == "ChatGPT (OpenAI)":
                     with st.spinner("Analyzing via OpenAI..."):
                         client = OpenAI(api_key=active_api_key)
