@@ -301,11 +301,11 @@ with col1:
 )
 
 # This variable then feeds into your build_prompt() function
-if commercial_status in ["Confirmed Yes", "Unsure / Needs Analysis"]:
+    if commercial_status in ["Confirmed Yes", "Unsure / Needs Analysis"]:
     # The code will now tell the AI to include the FMCSR Research section
-    include_fmcsr_analysis = True 
-else:
-    include_fmcsr_analysis = False
+        include_fmcsr_analysis = True 
+    else:
+        include_fmcsr_analysis = False
 
     # ── Case Summary ──
     case_summary = st.text_area(
