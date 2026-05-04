@@ -88,7 +88,7 @@ def build_prompt(stage, ctype, dlevel, doi, sol, summary, gov, comm_analysis):
     return f"Draft a Texas Litigation Blueprint. {params} Discovery Level: {dlevel} {gov_txt}{cv_txt} Headers: ## 1. Chronology, ## 2. Liability, ## 3. Proof Gaps, ## 4. Defense Anticipation, ## 5. Discovery Blueprint, ## 6. Strategic Flags."
 
 # ──────────────────────────────────────────────
-# 5. MAIN LAYOUT (Revised for Persistence)
+# 5. MAIN LAYOUT
 # ──────────────────────────────────────────────
 col1, col2 = st.columns([2, 3])
 
@@ -97,13 +97,13 @@ with col1:
     case_stage = st.radio("Case Stage:", ["Pre-Litigation", "Active Litigation"], horizontal=True)
     ai_engine = st.radio("Model Engine:", ["Gemini (Google)", "ChatGPT (OpenAI)", "Claude (Anthropic)"], horizontal=True)
 
-    # Use a unique key for the API input to force persistence
-    st.text_input(
-        f"{ai_engine} API Key", 
-        type="password", 
-        key="active_key_input",
-        value=env_gemini_key if ai_engine == "Gemini (Google)" else (env_openai_key if ai_engine == "ChatGPT (OpenAI)" else env_anthropic_key)
-    )
+    # API Key Sieve
+    if ai_engine == "Gemini (Google)":
+        active_key = st.text_input("Gemini API Key", value=env_gemini_key or "", type="password", key="gem_key")
+    elif ai_engine == "ChatGPT (OpenAI)":
+        active_key = st.text_input("OpenAI API Key", value=env_openai_key or "", type="password", key="gpt_key")
+    else:
+        active_key = st.text_input("Anthropic API Key", value=env_anthropic_key or "", type="password", key="claude_key")
 
     st.markdown("---")
     case_type = st.selectbox("Framework:", ["Standard MVA", "Trucking", "Premises", "Workplace", "UM/UIM", "TTCA"])
@@ -113,57 +113,23 @@ with col1:
         discovery_level = st.radio("Discovery Level:", ["Level 1", "Level 2", "Level 3"], index=1, horizontal=True)
 
     st.markdown("**Risk Flags**")
+    # 1. Government Entity Check
     government_entity = st.checkbox("Government Entity Involved")
     
-    # Binding the commercial status to a key prevents it from disappearing
-    st.radio(
+    # 2. Universal Commercial Vehicle Check (Moved outside all IF blocks)
+    comm_status = st.radio(
         "Commercial Vehicle Involved?", 
         ["No", "Yes", "Unsure"], 
-        key="comm_status_radio",
-        horizontal=True
+        index=0, 
+        horizontal=True,
+        key="commercial_flag_permanent"  # Added key for session persistence
     )
-    
-    case_summary = st.text_area("Case Summary", height=160)
+    include_comm = (comm_status in ["Yes", "Unsure"])
+
+    case_summary = st.text_area("Case Summary", height=160, placeholder="Detail the incident and liability theory...")
     
     with st.expander("Dates"):
-        doi = st.text_input("Incident Date", placeholder="YYYY-MM-DD")
-        sol = st.text_input("SOL Date", placeholder="YYYY-MM-DD")
+        date_of_incident = st.text_input("Incident Date", placeholder="YYYY-MM-DD")
+        sol_date = st.text_input("SOL Date", placeholder="YYYY-MM-DD")
 
     run_brief = st.button("Generate Case Intelligence Brief", type="primary", use_container_width=True)
-
-# ──────────────────────────────────────────────
-# 6. OUTPUT PANEL (Execution)
-# ──────────────────────────────────────────────
-with col2:
-    st.subheader("2. Case Intelligence Brief")
-
-    # Pulling values from session state to ensure they exist during rerun
-    current_key = st.session_state.get("active_key_input", "")
-    comm_flag = st.session_state.get("comm_status_radio", "No") in ["Yes", "Unsure"]
-
-    if run_brief:
-        if not case_summary.strip():
-            st.warning("Veto: Case summary required.")
-        elif not current_key:
-            st.error("Engine Error: Missing API Key.")
-        else:
-            prompt = build_prompt(case_stage, case_type, discovery_level, doi, sol, case_summary, government_entity, comm_flag)
-            
-            try:
-                if ai_engine == "Gemini (Google)":
-                    with st.spinner("Gemini thinking..."):
-                        genai.configure(api_key=current_key)
-                        model = genai.GenerativeModel("gemini-1.5-flash")
-                        st.session_state["brief_content"] = model.generate_content(prompt).text
-                # ... [Keep OpenAI/Claude blocks similar, using current_key] ...
-            except Exception as e:
-                st.error(f"Integrity Error: {e}")
-
-    # Display & Export
-    if st.session_state.get("brief_content"):
-        st.text_area("Edit Brief:", value=st.session_state["brief_content"], height=500, key="brief_editor")
-        # Update content from editor key
-        st.session_state["brief_content"] = st.session_state["brief_editor"]
-        
-        docx_data = generate_brief_docx(st.session_state["brief_content"], "CASE INTELLIGENCE BRIEF")
-        st.download_button("📥 Download (.docx)", data=docx_data, file_name="Case_Brief.docx", use_container_width=True)
