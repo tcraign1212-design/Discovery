@@ -66,19 +66,20 @@ def generate_brief_docx(text, title):
 # ──────────────────────────────────────────────
 # 3. PROMPT BUILDER
 # ──────────────────────────────────────────────
-def build_prompt(stage, ctype, dlevel, doi, sol, summary, gov):
-    # Logic for specific flags based on the Framework choice
-    gov_txt = "\n- GOV FLAG: Apply TTCA/Notice deadlines." if gov else ""
+def build_prompt(stage, ctype, dlevel, doi, sol, summary, gov, cv_jurisdiction):
+    gov_txt = "\n- GOV FLAG: Apply TTCA analysis/notice deadlines." if gov else ""
     
-    # Check if the framework is Trucking OR Commercial Vehicle
-    cv_analysis_needed = ctype in ["Trucking", "Commercial Vehicle"]
-    cv_txt = "\n- COMMERCIAL/FMCSR: Apply carrier safety, driver qualification, and preservation analysis." if cv_analysis_needed else ""
+    # Restored logic for Commercial Vehicle / Trucking flags
+    cv_analysis = ""
+    if ctype in ["Trucking", "Commercial Vehicle"]:
+        jurisdiction = f"Jurisdiction: {cv_jurisdiction}"
+        cv_analysis = f"\n- {ctype.upper()} FLAG: Apply {jurisdiction} analysis. Focus on driver logs, qualification files, and vehicle maintenance under relevant FMCSR/TX-DOT standards."
     
     params = f"Framework: {ctype}\nDOI: {doi}\nSOL: {sol}\nGov: {gov}\n\nSummary:\n{summary}"
     
     if stage == "Pre-Litigation":
-        return f"Draft Texas Pre-Suit Brief. {params} {gov_txt}{cv_txt} Headers: ## 1. Chronology, ## 2. Liability, ## 3. Risk Flags, ## 4. Proof Gaps, ## 5. Defense Anticipation, ## 6. Action Items."
-    return f"Draft Texas Litigation Blueprint. {params} Discovery: {dlevel} {gov_txt}{cv_txt} Headers: ## 1. Chronology, ## 2. Liability, ## 3. Proof Gaps, ## 4. Defense Anticipation, ## 5. Discovery Blueprint, ## 6. Strategic Flags."
+        return f"Draft Texas Pre-Suit Brief. {params} {gov_txt}{cv_analysis} Headers: ## 1. Chronology, ## 2. Liability, ## 3. Risk Flags, ## 4. Proof Gaps, ## 5. Defense Anticipation, ## 6. Action Items."
+    return f"Draft Texas Litigation Blueprint. {params} Discovery: {dlevel} {gov_txt}{cv_analysis} Headers: ## 1. Chronology, ## 2. Liability, ## 3. Proof Gaps, ## 4. Defense Anticipation, ## 5. Discovery Blueprint, ## 6. Strategic Flags."
 
 # ──────────────────────────────────────────────
 # 4. MAIN LAYOUT
