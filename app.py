@@ -14,7 +14,7 @@ st.title("Legal Utility: Case Review & Workflow Auditor")
 st.markdown("---")
 
 # --- SECURE API KEY RESOLUTION ---
-# This looks for keys securely stored in Streamlit Secrets or Environment Variables
+# Looks for default keys stored in system settings or environment variables
 env_gemini_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
 env_openai_key = st.secrets.get("OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY")
 
@@ -78,13 +78,16 @@ with tab1:
             horizontal=True
         )
         
-        # API Key Field Logic: 
-        # If the key is already stored securely in background secrets, do not ask the user for it.
         active_api_key = ""
+        
+        # Streamlit securely captures user inputs or defaults to your environment variables
         if ai_engine == "Gemini (Google)":
             if env_gemini_key:
-                st.info("🔒 Secure Gemini API Key detected in system settings.")
-                active_api_key = env_gemini_key
+                active_api_key = st.text_input(
+                    "Optional: Enter your own Gemini API Key to override default settings",
+                    value=env_gemini_key,
+                    type="password"
+                )
             else:
                 active_api_key = st.text_input(
                     "Required: Enter your personal Gemini API Key",
@@ -93,13 +96,16 @@ with tab1:
                 )
         elif ai_engine == "ChatGPT (OpenAI)":
             if env_openai_key:
-                st.info("🔒 Secure OpenAI API Key detected in system settings.")
-                active_api_key = env_openai_key
+                active_api_key = st.text_input(
+                    "Optional: Enter your own OpenAI API Key to override default settings",
+                    value=env_openai_key,
+                    type="password"
+                )
             else:
                 active_api_key = st.text_input(
-                    "Required: Enter your personal OpenAI API Key",
+                    "Required: Enter your personal OpenAI (ChatGPT) API Key",
                     type="password",
-                    placeholder="AI key is not logged or stored on the server"
+                    placeholder="sk-... (This key is not logged or stored on the server)"
                 )
         
         st.markdown("---")
@@ -108,7 +114,7 @@ with tab1:
         case_summary = st.text_area(
             "Case Summary / Fact Pattern",
             height=120,
-            placeholder="e.g., Rear-end collision on 4/15/2024. Defendant driver claims brakes failed. Plaintiff was treated at ER same day..."
+            placeholder="e.g., Rear-end collision on 4/15/2024. Defendant driver claims brakes failed..."
         )
         
         # Advanced Data Fields for Legal Integrity Screening
@@ -140,7 +146,7 @@ with tab1:
             if not case_summary:
                 st.warning("Please provide case details or a summary to analyze.")
             elif not active_api_key:
-                st.error(f"Please provide a valid {ai_engine} API Key to run the audit.")
+                st.error(f"Please provide a valid {ai_engine} API key to continue.")
             else:
                 modules_to_run = "\n".join([f"- {m}" for m in screening_modules])
                 
