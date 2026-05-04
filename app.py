@@ -9,9 +9,9 @@ import anthropic
 import os
 
 # 1. Page Configuration
-st.set_page_config(page_title="Case Review & Veto Auditor", layout="wide")
+st.set_page_config(page_title="Case Review & Discovery Generator", layout="wide")
 
-st.title("Legal Utility: Case Review & Workflow Auditor")
+st.title("Legal Utility: Case Review & Advanced Discovery Planner")
 st.markdown("---")
 
 # --- SECURE API KEY RESOLUTION ---
@@ -36,7 +36,7 @@ def generate_audit_docx(audit_text):
 
     p_title = doc.add_paragraph()
     p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run_title = p_title.add_run("CASE AUDIT & WORKFLOW VETO REPORT")
+    run_title = p_title.add_run("CASE AUDIT & TARGETED DISCOVERY PLAN")
     run_title.font.bold = True
     run_title.font.size = Pt(13)
     
@@ -63,215 +63,149 @@ def generate_audit_docx(audit_text):
     return buffer
 
 
-# 2. Tabs and Layout
-tab1, tab2 = st.tabs(["🔍 Case Review & Audit", "ℹ️ About the Veto Philosophy"])
+# 2. Main Input & Review Interface
+col1, col2 = st.columns([2, 3])
 
-with tab1:
-    col1, col2 = st.columns([1, 1])
+with col1:
+    st.subheader("1. Case Details (Minimal Inputs)")
+    
+    ai_engine = st.radio(
+        "Select Model Engine:",
+        ["Gemini (Google)", "ChatGPT (OpenAI)", "Claude (Anthropic)"],
+        horizontal=True
+    )
+    
+    active_api_key = ""
+    if ai_engine == "Gemini (Google)":
+        active_api_key = st.text_input("Gemini API Key", value=env_gemini_key or "", type="password")
+    elif ai_engine == "ChatGPT (OpenAI)":
+        active_api_key = st.text_input("OpenAI API Key", value=env_openai_key or "", type="password")
+    elif ai_engine == "Claude (Anthropic)":
+        active_api_key = st.text_input("Anthropic API Key", value=env_anthropic_key or "", type="password")
 
-    with col1:
-        st.subheader("1. Case & Workflow Inputs")
-        
-        # User AI Engine Selection
-        ai_engine = st.radio(
-            "Select Inference Model Engine:",
-            ["Gemini (Google)", "ChatGPT (OpenAI)", "Claude (Anthropic)"],
-            horizontal=True
-        )
-        
-        active_api_key = ""
-        
-        if ai_engine == "Gemini (Google)":
-            if env_gemini_key:
-                active_api_key = st.text_input(
-                    "Optional: Enter your own Gemini API Key to override default settings",
-                    value=env_gemini_key,
-                    type="password"
-                )
-            else:
-                active_api_key = st.text_input(
-                    "Required: Enter your personal Gemini API Key",
-                    type="password",
-                    placeholder="AI key is not logged or stored on the server"
-                )
-        elif ai_engine == "ChatGPT (OpenAI)":
-            if env_openai_key:
-                active_api_key = st.text_input(
-                    "Optional: Enter your own OpenAI API Key to override default settings",
-                    value=env_openai_key,
-                    type="password"
-                )
-            else:
-                active_api_key = st.text_input(
-                    "Required: Enter your personal OpenAI (ChatGPT) API Key",
-                    type="password",
-                    placeholder="sk-... (AI key is not logged or stored on the server)"
-                )
-        elif ai_engine == "Claude (Anthropic)":
-            if env_anthropic_key:
-                active_api_key = st.text_input(
-                    "Optional: Enter your own Anthropic API Key to override default settings",
-                    value=env_anthropic_key,
-                    type="password"
-                )
-            else:
-                active_api_key = st.text_input(
-                    "Required: Enter your personal Anthropic (Claude) API Key",
-                    type="password",
-                    placeholder="sk-ant-... (AI key is not logged or stored on the server)"
-                )
-        
-        st.markdown("---")
-        
-        # Restored Case Type Selection
-        case_type = st.selectbox(
-            "Select Case Type & Framework:",
-            [
-                "Standard Motor Vehicle Accident (MVA)",
-                "Commercial Vehicle / Trucking Crash",
-                "Premises Liability (Slip/Trip and Fall)",
-                "Workplace Injury / Non-Subscriber Claim",
-                "Uninsured/Underinsured Motorist (UM/UIM)",
-                "Texas Tort Claims Act (TTCA) / Sovereign Immunity"
-            ]
-        )
-        
-        # Case Details Input fields
-        case_summary = st.text_area(
-            "Case Summary / Fact Pattern",
-            height=120,
-            placeholder="e.g., Rear-end collision on 4/15/2024. Defendant driver claims brakes failed..."
-        )
-        
-        # Advanced Data Fields for Legal Integrity Screening
+    st.markdown("---")
+    
+    case_type = st.selectbox(
+        "Select Case Type & Framework:",
+        [
+            "Standard Motor Vehicle Accident (MVA)",
+            "Commercial Vehicle / Trucking Crash",
+            "Premises Liability (Slip/Trip/Fall)",
+            "Workplace Injury / Non-Subscriber",
+            "Uninsured/Underinsured Motorist (UM/UIM)",
+            "Texas Tort Claims Act (TTCA) / Sovereign Immunity"
+        ]
+    )
+    
+    discovery_level = st.radio(
+        "Discovery Level (Texas Rules of Civil Procedure):",
+        ["Level 1 (Expedited, up to $250k)", "Level 2 (Standard)", "Level 3 (Custom/Complex)"],
+        index=1,
+        horizontal=True
+    )
+    
+    case_summary = st.text_area(
+        "Brief Case Summary / Fact Pattern",
+        height=140,
+        placeholder="Enter key details here (e.g., rear-end collision, commercial truck lane change, slip on clear liquid...)"
+    )
+    
+    with st.expander("Optional Dates & Details"):
         c1, c2 = st.columns(2)
         with c1:
-            date_of_incident = st.text_input("Date of Incident (DOI)", placeholder="YYYY-MM-DD")
-            policy_limits = st.text_input("Insurance Limits ($)", placeholder="e.g., 30k/60k")
+            date_of_incident = st.text_input("Date of Incident", placeholder="YYYY-MM-DD")
         with c2:
-            sol_date = st.text_input("Statute of Limitations (SOL)", placeholder="YYYY-MM-DD")
-            health_lien = st.text_input("Known Liens ($)", placeholder="e.g., ER Lien 12k")
-            
-        screening_modules = st.multiselect(
-            "Select Specific Veto Sieve Checks to Execute:",
-            [
-                "Statute of Limitations (SOL) Calculation & Threat Analysis",
-                "Causation Gaps (Pre-existing injuries / Gaps in treatment)",
-                "Coverage Squeeze (Policy Limits vs. Potential Case Valuation)",
-                "Lien Squeeze (Health Insurance & Medical Liens vs. Gross Settlement)"
-            ],
-            default=["Statute of Limitations (SOL) Calculation & Threat Analysis", "Causation Gaps (Pre-existing injuries / Gaps in treatment)"]
-        )
-        
-        run_audit = st.button("Generate Case Audit Report", type="primary")
+            sol_date = st.text_input("Statute of Limitations", placeholder="YYYY-MM-DD")
 
-    with col2:
-        st.subheader("2. Audit & Risk Evaluation")
-        
-        if run_audit:
-            if not case_summary:
-                st.warning("Please provide case details or a summary to analyze.")
-            elif not active_api_key:
-                st.error(f"Please provide a valid {ai_engine} API key to continue.")
-            else:
-                modules_to_run = "\n".join([f"- {m}" for m in screening_modules])
-                
-                # Sieve Audit Prompt
-                prompt = f"""
-                You are a defense-minded legal auditor and personal injury workflow analyst. 
-                Your core operational strategy is the 'Veto Philosophy'—treating every review as a sieve to catch fatal case errors before proceeding to the next litigation phase.
+    run_audit = st.button("Generate Plan & Discovery", type="primary", use_container_width=True)
 
-                CASE FRAMEWORK TYPE:
-                {case_type}
-
-                CASE SPECIFICS PROVIDED:
-                - Date of Incident: {date_of_incident if date_of_incident else "Not provided"}
-                - Statute of Limitations Date: {sol_date if sol_date else "Not provided"}
-                - Insurance Limits: {policy_limits if policy_limits else "Not provided"}
-                - Known Liens/ER Bills: {health_lien if health_lien else "Not provided"}
-                
-                CASE SUMMARY:
-                "{case_summary}"
-
-                SPECIFIC RISK MODULES TO EVALUATE:
-                {modules_to_run if modules_to_run else "Standard comprehensive case review checks."}
-
-                TASK RULES:
-                1. Critically analyze the details above. Treat the case with a skeptical eye, seeking where it might fail down the line based on the Case Framework Type.
-                2. If TTCA is selected, strictly calculate pre-suit notice deadlines (e.g., 6 months under TTCA § 101.101, or shorter municipal charters).
-                3. If UM/UIM is selected, analyze requirements for establishing the uninsured status or underlying policy exhaustion.
-                4. Structure output strictly with clear headers:
-                   - ## 1. Summary of Exposure & Phase-Gate Readiness
-                   - ## 2. Core Veto Sieve Violations (Red Flags)
-                   - ## 3. Actionable Mitigation Tasks (Pre-Litigation or Pre-Phase Move)
-                4. Maintain a strategic, sharp, and data-integrity focused tone.
-                """
-                
-                output_text = ""
-                
-                # Inference Routing
-                if ai_engine == "Gemini (Google)":
-                    with st.spinner("Processing through Gemini Veto Sieve..."):
-                        try:
-                            genai.configure(api_key=active_api_key)
-                            model = genai.GenerativeModel("gemini-2.5-flash")
-                            response = model.generate_content(prompt)
-                            output_text = response.text
-                        except Exception as e:
-                            st.error(f"Error calling Gemini AI: {e}")
-                                
-                elif ai_engine == "ChatGPT (OpenAI)":
-                    with st.spinner("Processing through ChatGPT Veto Sieve..."):
-                        try:
-                            client = OpenAI(api_key=active_api_key)
-                            response = client.chat.completions.create(
-                                model="gpt-4o",
-                                messages=[{"role": "user", "content": prompt}]
-                            )
-                            output_text = response.choices[0].message.content
-                        except Exception as e:
-                            st.error(f"Error calling ChatGPT AI: {e}")
-
-                elif ai_engine == "Claude (Anthropic)":
-                    with st.spinner("Processing through Claude Veto Sieve..."):
-                        try:
-                            client = anthropic.Anthropic(api_key=active_api_key)
-                            response = client.messages.create(
-                                model="claude-3-5-sonnet-20241022",
-                                max_tokens=2500,
-                                messages=[{"role": "user", "content": prompt}]
-                            )
-                            output_text = response.content[0].text
-                        except Exception as e:
-                            st.error(f"Error calling Claude AI: {e}")
-                
-                if output_text:
-                    st.success("Case Audit Generated Successfully")
-                    st.session_state["last_audit_output"] = output_text
-
-        # 4. Display Persistent Downloads
-        if "last_audit_output" in st.session_state:
-            output_text = st.session_state["last_audit_output"]
-            
-            st.markdown("### Export Report to Word")
-            docx_data = generate_audit_docx(output_text)
-            st.download_button(
-                label="📥 Download Audit Report (.docx)",
-                data=docx_data,
-                file_name="Case_Workflow_Veto_Report.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                use_container_width=True
-            )
-            
-            st.markdown("---")
-            st.markdown(output_text)
-
-with tab2:
-    st.markdown("""
-    ### The Veto Philosophy
-    Building elite case-management processes means setting up mechanical safeguards that catch issues before they turn into major liabilities.
+with col2:
+    st.subheader("2. Audit Preview & Edit")
     
-    * **Statute of Limitations:** Tracks critical countdown metrics to stop procedural defaults.
-    * **Causation Integrity:** Catches treatment gaps and pre-existing injury issues before defense discovery can exploit them.
-    * **Lien/Coverage Squeezes:** Compares total medical costs against available policy coverage early, avoiding unprofitable settlements down the line.
-    """)
+    if run_audit:
+        if not case_summary:
+            st.warning("Please provide a case summary to proceed.")
+        elif not active_api_key:
+            st.error(f"Please enter an API key for {ai_engine} above.")
+        else:
+            prompt = f"""
+            You are an expert personal injury litigation analyst and workflow strategist. Your task is to perform an objective case readiness review and draft case-specific, high-utility discovery requests.
+
+            CASE PARAMETERS:
+            - Framework Type: {case_type}
+            - Discovery Level: {discovery_level}
+            - Date of Incident: {date_of_incident if date_of_incident else "Not provided"}
+            - Statute of Limitations: {sol_date if sol_date else "Not provided"}
+            
+            CASE SUMMARY:
+            "{case_summary}"
+
+            RULES & DIRECTIVES:
+            1. Focus strictly on critical chronology, liability exposure, and strategic proof. Do not over-index on damages unless directly relevant to liability proof.
+            2. For discovery, DO NOT include questions or requests covered under TRCP Rule 194.2 Required Disclosures (e.g., no requests for basic insurance dec sheets, witness contact info, or medical records). Focus on liability mechanics, maintenance history, cell phone usage, and scene evidence.
+            3. Limit discovery items to 3 case-specific Interrogatories and 3 targeted Requests for Production that directly address the weaknesses in the fact pattern.
+            4. Structure the output clearly using these headers:
+               - ## 1. Chronology & Case Metrics
+               - ## 2. Merits & Liability Exposure Analysis
+               - ## 3. Targeted Pre-Litigation Steps
+               - ## 4. Custom Discovery Requests (Excludes Initial Disclosures)
+            """
+            
+            output_text = ""
+            
+            if ai_engine == "Gemini (Google)":
+                with st.spinner("Analyzing case via Gemini..."):
+                    try:
+                        genai.configure(api_key=active_api_key)
+                        model = genai.GenerativeModel("gemini-2.5-flash")
+                        response = model.generate_content(prompt)
+                        output_text = response.text
+                    except Exception as e:
+                        st.error(f"Inference error: {e}")
+                            
+            elif ai_engine == "ChatGPT (OpenAI)":
+                with st.spinner("Analyzing case via OpenAI..."):
+                    try:
+                        client = OpenAI(api_key=active_api_key)
+                        response = client.chat.completions.create(
+                            model="gpt-4o",
+                            messages=[{"role": "user", "content": prompt}]
+                        )
+                        output_text = response.choices[0].message.content
+                    except Exception as e:
+                        st.error(f"Inference error: {e}")
+
+            elif ai_engine == "Claude (Anthropic)":
+                with st.spinner("Analyzing case via Anthropic..."):
+                    try:
+                        client = anthropic.Anthropic(api_key=active_api_key)
+                        response = client.messages.create(
+                            model="claude-3-5-sonnet-20241022",
+                            max_tokens=2500,
+                            messages=[{"role": "user", "content": prompt}]
+                        )
+                        output_text = response.content[0].text
+                    except Exception as e:
+                        st.error(f"Inference error: {e}")
+            
+            if output_text:
+                st.session_state["review_content"] = output_text
+
+    # Let the user view, edit, and download the report directly on screen
+    if "review_content" in st.session_state:
+        edited_text = st.text_area(
+            "Review and edit your report below before exporting:",
+            value=st.session_state["review_content"],
+            height=400
+        )
+        st.session_state["review_content"] = edited_text
+        
+        st.markdown("### Export Report to Word")
+        docx_data = generate_audit_docx(st.session_state["review_content"])
+        st.download_button(
+            label="📥 Download Audit & Discovery Plan (.docx)",
+            data=docx_data,
+            file_name="Case_Audit_And_Discovery_Plan.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            use_container_width=True
+        )
