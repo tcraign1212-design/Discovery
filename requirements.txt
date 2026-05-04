@@ -1,8 +1,5 @@
 streamlit
 google-generativeai
-pypdf
-docx2txt
 python-docx
-fpdf2
 openai
 anthropic
