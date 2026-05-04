@@ -66,11 +66,15 @@ def generate_brief_docx(text, title):
 # ──────────────────────────────────────────────
 # 3. PROMPT BUILDER
 # ──────────────────────────────────────────────
-def build_prompt(stage, ctype, dlevel, doi, sol, summary, gov, comm):
+def build_prompt(stage, ctype, dlevel, doi, sol, summary, gov):
+    # Logic for specific flags based on the Framework choice
     gov_txt = "\n- GOV FLAG: Apply TTCA/Notice deadlines." if gov else ""
-    cv_txt = "\n- COMMERCIAL FLAG: Apply carrier safety/FMCSR analysis." if comm else ""
     
-    params = f"Framework: {ctype}\nDOI: {doi}\nSOL: {sol}\nGov: {gov}\nComm: {comm}\n\nSummary:\n{summary}"
+    # Check if the framework is Trucking OR Commercial Vehicle
+    cv_analysis_needed = ctype in ["Trucking", "Commercial Vehicle"]
+    cv_txt = "\n- COMMERCIAL/FMCSR: Apply carrier safety, driver qualification, and preservation analysis." if cv_analysis_needed else ""
+    
+    params = f"Framework: {ctype}\nDOI: {doi}\nSOL: {sol}\nGov: {gov}\n\nSummary:\n{summary}"
     
     if stage == "Pre-Litigation":
         return f"Draft Texas Pre-Suit Brief. {params} {gov_txt}{cv_txt} Headers: ## 1. Chronology, ## 2. Liability, ## 3. Risk Flags, ## 4. Proof Gaps, ## 5. Defense Anticipation, ## 6. Action Items."
@@ -95,7 +99,12 @@ with col1:
         active_key = st.text_input("Anthropic API Key", value=env_anthropic_key or "", type="password")
 
     st.markdown("---")
-    case_type = st.selectbox("Framework:", ["Standard MVA", "Trucking", "Premises", "Workplace", "UM/UIM", "TTCA"])
+    
+    # ADDED "Commercial Vehicle" TO THE DROPDOWN LIST HERE
+    case_type = st.selectbox(
+        "Framework:", 
+        ["Standard MVA", "Commercial Vehicle", "Trucking", "Premises", "Workplace", "UM/UIM", "TTCA"]
+    )
     
     discovery_level = "Level 2"
     if case_stage == "Active Litigation":
@@ -104,9 +113,7 @@ with col1:
     st.markdown("**Risk Flags**")
     government_entity = st.checkbox("Government Entity Involved")
     
-    # UNIVERSAL COMMERCIAL FLAG (Always visible)
-    comm_status = st.radio("Commercial Vehicle Involved?", ["No", "Yes", "Unsure"], index=0, horizontal=True)
-    include_comm = (comm_status in ["Yes", "Unsure"])
+    # REMOVED the separate commercial status radio button to keep the UI clean
 
     case_summary = st.text_area("Case Summary", height=160)
     
