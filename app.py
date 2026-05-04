@@ -49,12 +49,82 @@ def generate_brief_docx(text, title):
     buf = io.BytesIO(); doc.save(buf); buf.seek(0)
     return buf
 
-# 3. PROMPT BUILDER
+# ──────────────────────────────────────────────
+# 3. STRATEGIC PROMPT BUILDER
+# ──────────────────────────────────────────────
 def build_prompt(stage, ctype, dlevel, doi, sol, summary, gov, cv_jurisdiction):
-    gov_txt = "\n- GOV FLAG: Apply TTCA analysis." if gov else ""
-    cv_txt = f"\n- COMMERCIAL FLAG: Apply {cv_jurisdiction} analysis." if "Commercial" in ctype else ""
-    params = f"Framework: {ctype}\nDOI: {doi}\nSOL: {sol}\n\nSummary:\n{summary}"
-    return f"Draft Texas {'Pre-Suit Brief' if stage == 'Pre-Litigation' else 'Litigation Blueprint'}. {params} {gov_txt}{cv_txt}"
+    gov_flag = (
+        "\n   - GOVERNMENT ENTITY FLAG: Apply TTCA / sovereign immunity analysis. "
+        "Identify specific agency rules and notice deadlines (e.g., 6-month notice)."
+        if gov else ""
+    )
+
+    cv_flag = (
+        f"\n   - COMMERCIAL VEHICLE FLAG: Apply FMCSR / {cv_jurisdiction} analysis. "
+        "Flag DQF, Hours of Service, and black box preservation obligations."
+        if "Commercial" in ctype or "Trucking" in ctype else ""
+    )
+
+    shared_params = f"""
+CASE PARAMETERS:
+- Framework: {ctype}
+- DOI: {doi if doi else "Not provided"}
+- SOL: {sol if sol else "Not provided"}
+- Gov Involvement: {"YES" if gov else "No"}
+- Commercial Involvement: {"YES" if cv_jurisdiction != "N/A" else "No"}
+
+CASE SUMMARY:
+\"\"\"{summary}\"\"\"
+"""
+
+    if stage == "Pre-Litigation":
+        return f"""
+You are a Texas personal injury litigation strategist conducting a pre-suit intake review. 
+Your output is a Case Intelligence Brief—a structured strategic framework for early case workup.
+Do NOT draft discovery requests. This matter has not been filed.
+
+{shared_params}
+{gov_flag}{cv_flag}
+
+DIRECTIVES:
+1. Identify specific agency notice deadlines (TTCA vs. Home-Rule).
+2. List FOIA / Texas Public Information Act targets and record categories.
+3. Identify spoliation risks and what preservation demand letters should issue immediately.
+4. Be precise on dates. If the SOL date is provided, flag approaching windows.
+5. Use these exact headers:
+## 1. Chronology & Case Metrics
+## 2. Liability Theory & Exposure Analysis
+## 3. Intake Risk Flags
+## 4. Proof Gap Analysis
+## 5. Defense Anticipation
+## 6. Pre-Suit Action Items
+"""
+
+    else:  # Active Litigation
+        return f"""
+You are a Texas personal injury litigation strategist conducting a case workup review for
+an active suit. Your output is a Case Intelligence Brief — a Discovery Blueprint and
+strategic framework. Do NOT draft actual discovery requests. 
+
+{shared_params}
+- Discovery Level: {dlevel}
+{gov_flag}{cv_flag}
+
+DIRECTIVES:
+1. Do not include items covered by TRCP Rule 194.2 Required Disclosures.
+2. Organize the Discovery Blueprint by target and strategic purpose.
+3. Identify expert witness needs, spoliation risks, and insurance/coverage issues.
+4. Use these exact headers:
+## 1. Chronology & Case Metrics
+## 2. Liability Theory & Exposure Analysis
+## 3. Proof Gap Analysis
+## 4. Defense Anticipation & Contention Points
+## 5. Discovery Blueprint
+  ### Requests for Admission
+  ### Requests for Production
+  ### Interrogatories
+## 6. Strategic Flags
+"""
 
 # 4. MAIN LAYOUT
 col1, col2 = st.columns([2, 3])
