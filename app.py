@@ -90,8 +90,15 @@ with col2:
             try:
                 if ai_engine == "Gemini (Google)":
                     with st.spinner("Gemini thinking..."):
+                        # Initialize client with explicit API version if necessary
                         client = genai.Client(api_key=active_key)
-                        response = client.models.generate_content(model="gemini-1.5-flash", contents=prompt)
+                        
+                        # Use the simplified string 'gemini-1.5-flash' 
+                        # The new SDK handles the routing internally
+                        response = client.models.generate_content(
+                            model='gemini-1.5-flash', 
+                            contents=prompt
+                        )
                         st.session_state["brief_content"] = response.text
                 elif ai_engine == "ChatGPT (OpenAI)":
                     with st.spinner("OpenAI thinking..."):
