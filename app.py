@@ -123,6 +123,19 @@ with tab1:
         
         st.markdown("---")
         
+        # Restored Case Type Selection
+        case_type = st.selectbox(
+            "Select Case Type & Framework:",
+            [
+                "Standard Motor Vehicle Accident (MVA)",
+                "Commercial Vehicle / Trucking Crash",
+                "Premises Liability (Slip/Trip and Fall)",
+                "Workplace Injury / Non-Subscriber Claim",
+                "Uninsured/Underinsured Motorist (UM/UIM)",
+                "Texas Tort Claims Act (TTCA) / Sovereign Immunity"
+            ]
+        )
+        
         # Case Details Input fields
         case_summary = st.text_area(
             "Case Summary / Fact Pattern",
@@ -143,118 +156,4 @@ with tab1:
             "Select Specific Veto Sieve Checks to Execute:",
             [
                 "Statute of Limitations (SOL) Calculation & Threat Analysis",
-                "Causation Gaps (Pre-existing injuries / Gaps in treatment)",
-                "Coverage Squeeze (Policy Limits vs. Potential Case Valuation)",
-                "Lien Squeeze (Health Insurance & Medical Liens vs. Gross Settlement)"
-            ],
-            default=["Statute of Limitations (SOL) Calculation & Threat Analysis", "Causation Gaps (Pre-existing injuries / Gaps in treatment)"]
-        )
-        
-        run_audit = st.button("Generate Case Audit Report", type="primary")
-
-    with col2:
-        st.subheader("2. Audit & Risk Evaluation")
-        
-        if run_audit:
-            if not case_summary:
-                st.warning("Please provide case details or a summary to analyze.")
-            elif not active_api_key:
-                st.error(f"Please provide a valid {ai_engine} API key to continue.")
-            else:
-                modules_to_run = "\n".join([f"- {m}" for m in screening_modules])
-                
-                # Sieve Audit Prompt
-                prompt = f"""
-                You are a defense-minded legal auditor and personal injury workflow analyst. 
-                Your core operational strategy is the 'Veto Philosophy'—treating every review as a sieve to catch fatal case errors before proceeding to the next litigation phase.
-
-                CASE SPECIFICS PROVIDED:
-                - Date of Incident: {date_of_incident if date_of_incident else "Not provided"}
-                - Statute of Limitations Date: {sol_date if sol_date else "Not provided"}
-                - Insurance Limits: {policy_limits if policy_limits else "Not provided"}
-                - Known Liens/ER Bills: {health_lien if health_lien else "Not provided"}
-                
-                CASE SUMMARY:
-                "{case_summary}"
-
-                SPECIFIC RISK MODULES TO EVALUATE:
-                {modules_to_run if modules_to_run else "Standard comprehensive case review checks."}
-
-                TASK RULES:
-                1. Critically analyze the details above. Treat the case with a skeptical eye, seeking where it might fail down the line.
-                2. Explicitly review the active Modules requested. Call out missing data, insurance or lien discrepancies, and temporal risks.
-                3. Structure output strictly with clear headers:
-                   - ## 1. Summary of Exposure & Phase-Gate Readiness
-                   - ## 2. Core Veto Sieve Violations (Red Flags)
-                   - ## 3. Actionable Mitigation Tasks (Pre-Litigation or Pre-Phase Move)
-                4. Maintain a strategic, sharp, and data-integrity focused tone.
-                """
-                
-                output_text = ""
-                
-                # Inference Routing
-                if ai_engine == "Gemini (Google)":
-                    with st.spinner("Processing through Gemini Veto Sieve..."):
-                        try:
-                            genai.configure(api_key=active_api_key)
-                            model = genai.GenerativeModel("gemini-2.5-flash")
-                            response = model.generate_content(prompt)
-                            output_text = response.text
-                        except Exception as e:
-                            st.error(f"Error calling Gemini AI: {e}")
-                                
-                elif ai_engine == "ChatGPT (OpenAI)":
-                    with st.spinner("Processing through ChatGPT Veto Sieve..."):
-                        try:
-                            client = OpenAI(api_key=active_api_key)
-                            response = client.chat.completions.create(
-                                model="gpt-4o",
-                                messages=[{"role": "user", "content": prompt}]
-                            )
-                            output_text = response.choices[0].message.content
-                        except Exception as e:
-                            st.error(f"Error calling ChatGPT AI: {e}")
-
-                elif ai_engine == "Claude (Anthropic)":
-                    with st.spinner("Processing through Claude Veto Sieve..."):
-                        try:
-                            client = anthropic.Anthropic(api_key=active_api_key)
-                            response = client.messages.create(
-                                model="claude-3-5-sonnet-20241022",
-                                max_tokens=2500,
-                                messages=[{"role": "user", "content": prompt}]
-                            )
-                            output_text = response.content[0].text
-                        except Exception as e:
-                            st.error(f"Error calling Claude AI: {e}")
-                
-                if output_text:
-                    st.success("Case Audit Generated Successfully")
-                    st.session_state["last_audit_output"] = output_text
-
-        # 4. Display Persistent Downloads
-        if "last_audit_output" in st.session_state:
-            output_text = st.session_state["last_audit_output"]
-            
-            st.markdown("### Export Report to Word")
-            docx_data = generate_audit_docx(output_text)
-            st.download_button(
-                label="📥 Download Audit Report (.docx)",
-                data=docx_data,
-                file_name="Case_Workflow_Veto_Report.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                use_container_width=True
-            )
-            
-            st.markdown("---")
-            st.markdown(output_text)
-
-with tab2:
-    st.markdown("""
-    ### The Veto Philosophy
-    Building elite case-management processes means setting up mechanical safeguards that catch issues before they turn into major liabilities.
-    
-    * **Statute of Limitations:** Tracks critical countdown metrics to stop procedural defaults.
-    * **Causation Integrity:** Catches treatment gaps and pre-existing injury issues before defense discovery can exploit them.
-    * **Lien/Coverage Squeezes:** Compares total medical costs against available policy coverage early, avoiding unprofitable settlements down the line.
-    """)
+                "Causation Gaps (Pre-
